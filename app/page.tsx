@@ -12,7 +12,7 @@ export default function CandidateTool() {
   const [error, setError] = useState('')
   const [activeTab, setActiveTab] = useState<'optimize' | 'extract'>('optimize')
 
-  const API_URL = process.env.NEXT_PUBLIC_API_URL
+  const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"
 
   const handleOptimize = async () => {
     if (!resume.trim() || !jobDescription.trim()) {
