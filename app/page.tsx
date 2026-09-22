@@ -321,6 +321,9 @@ export default function CandidateTool() {
         <div className='mb-10 text-center'>
           <h1 className='text-4xl font-bold text-slate-900'>TalentSeek</h1>
           <p className='mt-3 text-slate-600'>AI Resume Optimization Tool</p>
+          <a href='/master-resume' className='mt-3 inline-block rounded-lg border border-slate-300 px-4 py-1.5 text-sm text-slate-600 hover:border-slate-500 hover:text-slate-900'>
+            📋 Build Master Resume
+          </a>
         </div>
 
         <div className='grid gap-8 lg:grid-cols-2'>
@@ -362,7 +365,7 @@ export default function CandidateTool() {
             <div className='mt-5'>
               <button onClick={handleOptimize} disabled={isLoading}
                 className='w-full rounded-xl bg-slate-900 px-5 py-3 text-white disabled:opacity-50'>
-                {isLoading ? 'Optimizing...' : '✨ Optimize Resume'}
+                {isLoading ? 'Working...' : '✨ Optimize Resume'}
               </button>
             </div>
             {error && <div className='mt-4 rounded-xl bg-red-50 p-4 text-sm text-red-700'>{error}</div>}
@@ -380,7 +383,7 @@ export default function CandidateTool() {
             {isLoading && (
               <div className='flex flex-col items-center gap-3 py-12'>
                 <LoadingSpinner />
-                <p className='text-sm text-slate-500'>Optimizing with Claude AI...</p>
+                <p className='text-sm text-slate-500'>World-leading AI is tailoring your resume for this role...</p>
               </div>
             )}
 
