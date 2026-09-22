@@ -111,6 +111,14 @@ export default function AdminDashboard() {
               className='rounded-xl border border-slate-300 px-4 py-2 text-sm text-slate-700 hover:bg-slate-100'>
               🔄 Refresh
             </button>
+            <a href='/admin/prompts'
+              className='rounded-xl border border-slate-300 px-4 py-2 text-sm text-slate-700 hover:bg-slate-100'>
+              ✏️ Prompt Editor
+            </a>
+            <a href='/recruiter'
+              className='rounded-xl border border-slate-300 px-4 py-2 text-sm text-slate-700 hover:bg-slate-100'>
+              🎯 Recruiter Console
+            </a>
             <a href='/'
               className='rounded-xl border border-slate-300 px-4 py-2 text-sm text-slate-700 hover:bg-slate-100'>
               ← Back to App
