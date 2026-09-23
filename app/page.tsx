@@ -168,6 +168,7 @@ export default function CandidateTool() {
   const [resume, setResume] = useState('')
   const [jobDescription, setJobDescription] = useState('')
   const [optimizedResume, setOptimizedResume] = useState('')
+  const [profileImprovements, setProfileImprovements] = useState('')
   const [analysis, setAnalysis] = useState<AnalysisResult | null>(null)
   const [isLoading, setIsLoading] = useState(false)
   const [isAnalyzing, setIsAnalyzing] = useState(false)
@@ -225,26 +226,22 @@ export default function CandidateTool() {
 
   const handleOptimize = async () => {
     if (!resume.trim() || !jobDescription.trim()) { setError('Please fill in both fields'); return }
-    setIsLoading(true); setError(''); setOptimizedResume(''); setAnalysis(null)
+    setIsLoading(true); setError(''); setOptimizedResume(''); setProfileImprovements(''); setAnalysis(null)
     try {
-      const lengthInstruction = resumeLength === '1'
-        ? 'LENGTH: Keep to 1 page maximum. Be very concise, only most relevant roles.'
-        : resumeLength === '2'
-        ? 'LENGTH: Keep to 2 pages. Balance detail with conciseness.'
-        : 'LENGTH: Detailed resume, 3+ pages. Include comprehensive experience and achievements.'
-
       const authHeaders = await getAuthHeaders()
       const res = await fetch(`${API_URL}/resumes/optimize-demo`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', ...authHeaders },
         body: JSON.stringify({
           content: resume,
-          job_description: jobDescription + '\n\n' + lengthInstruction,
+          job_description: jobDescription,
+          length_pages: Number(resumeLength),
         }),
       })
       if (!res.ok) throw new Error('Optimization failed')
       const data = await res.json()
       setOptimizedResume(data.optimized_content || '')
+      setProfileImprovements(data.profile_improvements || '')
 
       setIsAnalyzing(true)
       try {
@@ -271,6 +268,56 @@ export default function CandidateTool() {
       }]
     })
     saveAs(await Packer.toBlob(doc), `${filename}.docx`)
+  }
+
+  const downloadProfileImprovements = async () => {
+    if (!profileImprovements.trim()) return
+
+    const lines = profileImprovements.split('\n')
+
+    const doc = new Document({
+      sections: [{
+        properties: {
+          page: {
+            margin: { top: 720, bottom: 720, left: 1080, right: 1080 }
+          }
+        },
+        children: [
+          new Paragraph({
+            children: [
+              new TextRun({
+                text: 'PROFILE IMPROVEMENT REPORT',
+                bold: true,
+                size: 28,
+                font: 'Calibri',
+              })
+            ],
+            spacing: { after: 240 },
+          }),
+          ...lines.map(line =>
+            new Paragraph({
+              children: [
+                new TextRun({
+                  text: line,
+                  bold:
+                    line.trim() === 'MANDATORY INFORMATION / GAPS' ||
+                    line.trim() === 'OPTIONAL PROFILE IMPROVEMENTS',
+                  size: 20,
+                  font: 'Calibri',
+                })
+              ],
+              spacing: { after: 100 },
+            })
+          ),
+        ],
+      }],
+    })
+
+    const filename = buildFilename(optimizedResume, jobDescription)
+    saveAs(
+      await Packer.toBlob(doc),
+      `${filename}-profile-improvements.docx`
+    )
   }
 
   const downloadPdf = () => {
@@ -442,6 +489,28 @@ export default function CandidateTool() {
                   </div>
                   <pre className='max-h-56 overflow-y-auto whitespace-pre-wrap rounded-xl bg-slate-100 p-4 text-sm text-slate-800'>{optimizedResume}</pre>
                 </div>
+
+                {profileImprovements && (
+                  <div className='rounded-xl border border-amber-200 bg-amber-50 p-4'>
+                    <div className='mb-3 flex items-center justify-between gap-3'>
+                      <div>
+                        <h3 className='font-semibold text-amber-900'>Profile Improvement Report</h3>
+                        <p className='mt-1 text-xs text-amber-700'>
+                          Missing information, gaps, and optional profile improvements are kept separate from your resume.
+                        </p>
+                      </div>
+                      <button
+                        onClick={downloadProfileImprovements}
+                        className='shrink-0 rounded-lg border border-amber-300 bg-white px-3 py-1.5 text-xs font-medium text-amber-800 hover:bg-amber-100'
+                      >
+                        📥 Download Report
+                      </button>
+                    </div>
+                    <pre className='max-h-56 overflow-y-auto whitespace-pre-wrap text-sm text-amber-900'>
+                      {profileImprovements}
+                    </pre>
+                  </div>
+                )}
 
                 {isAnalyzing && (
                   <div className='flex items-center gap-2 text-sm text-slate-500'>
