@@ -7,8 +7,6 @@ import { saveAs } from 'file-saver'
 import jsPDF from 'jspdf'
 import { supabase } from '../../lib/supabase'
 
-const RECRUITER_PASSWORD = 'recruiter2026'
-
 type CareerAnalysis = {
   seniority_level: string
   years_experience: number
@@ -120,10 +118,6 @@ const fitColor = (fit: string) =>
   : 'bg-yellow-100 text-yellow-700 border-yellow-200'
 
 export default function RecruiterTool() {
-  const [password, setPassword] = useState('')
-  const [authenticated, setAuthenticated] = useState(false)
-  const [authError, setAuthError] = useState('')
-
   const [candidateName, setCandidateName] = useState('')
   const [candidateLocation, setCandidateLocation] = useState('')
   const [targetRole, setTargetRole] = useState('')
@@ -154,11 +148,6 @@ export default function RecruiterTool() {
       : {}
   }
 
-
-  const handleLogin = () => {
-    if (password === RECRUITER_PASSWORD) { setAuthenticated(true); setAuthError('') }
-    else setAuthError('Incorrect password')
-  }
 
   const parseFile = async (file: File, setter: (t: string) => void, setUploading: (b: boolean) => void) => {
     setUploading(true); setError('')
@@ -270,32 +259,6 @@ export default function RecruiterTool() {
   const downloadFeedbackDocx = async () => {
     const doc = new Document({ sections: [{ properties: { page: { margin: { top:720,bottom:720,left:1080,right:1080 } } }, children: buildFeedbackDocx(feedback, candidateName, targetRole) }] })
     saveAs(await Packer.toBlob(doc), `${candidateName.replace(/\s+/g,'-')}-feedback-report.docx`)
-  }
-
-  if (!authenticated) {
-    return (
-      <main className='min-h-screen bg-slate-50 flex items-center justify-center px-6'>
-        <div className='w-full max-w-sm rounded-2xl bg-white p-8 shadow-sm'>
-          <div className='mb-6 text-center'>
-            <p className='text-xs font-medium uppercase tracking-widest text-slate-400 mb-2'>TalentSeek</p>
-            <h1 className='text-2xl font-bold text-slate-900'>Recruiter Portal</h1>
-            <p className='mt-2 text-sm text-slate-500'>Resume Consultation Tool</p>
-          </div>
-          <input type='password' value={password} onChange={e => setPassword(e.target.value)}
-            onKeyDown={e => e.key === 'Enter' && handleLogin()}
-            placeholder='Enter recruiter password'
-            className='mb-3 w-full rounded-xl border border-slate-200 bg-white p-3 text-sm text-slate-900 placeholder:text-slate-400 outline-none focus:border-slate-500 shadow-sm' />
-          {authError && <p className='mb-3 text-sm text-red-600'>{authError}</p>}
-          <button onClick={handleLogin}
-            className='w-full rounded-xl bg-slate-900 py-3 text-sm font-medium text-white hover:bg-slate-800'>
-            Sign In
-          </button>
-          <p className='mt-4 text-center text-xs text-slate-400'>
-            <a href='/' className='hover:text-slate-600'>← Back to candidate tool</a>
-          </p>
-        </div>
-      </main>
-    )
   }
 
   return (
