@@ -15,6 +15,8 @@ type CareerAnalysis = {
   outside_industry: { title: string; industry: string; fit: string; why: string; salary_cad: string }[]
   salary_benchmark: { role: string; location: string; range_cad: string; notes: string }
   career_advice: string
+  status?: string
+  questions?: string[]
   error?: string
 }
 
@@ -417,7 +419,21 @@ export default function RecruiterTool() {
                     </div>
                   )}
 
-                  {activeTab === 'career' && analysis && !analysis.error && (
+                  {activeTab === 'career' && analysis?.status === 'needs_more_information' && (
+                    <div className='rounded-xl border border-amber-200 bg-amber-50 p-5'>
+                      <h3 className='font-semibold text-amber-900'>More Information Needed</h3>
+                      <p className='mt-2 text-sm text-amber-800'>
+                        Please provide the following details to complete a reliable career analysis:
+                      </p>
+                      <ul className='mt-3 list-disc space-y-2 pl-5 text-sm text-amber-800'>
+                        {analysis.questions?.map((q, i) => (
+                          <li key={i}>{q}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+
+                  {activeTab === 'career' && analysis && !analysis.error && analysis.status !== 'needs_more_information' && (
                     <div className='space-y-6'>
                       {/* Header */}
                       <div className='rounded-xl bg-slate-900 p-4 text-white'>
