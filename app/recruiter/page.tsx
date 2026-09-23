@@ -227,7 +227,28 @@ export default function RecruiterTool() {
         }),
       })
       const d3 = await r3.json()
-      setAnalysis(d3)
+
+      if (!r3.ok || d3.error) {
+        throw new Error(d3.error || 'Career analysis failed')
+      }
+
+      setAnalysis({
+        status: d3.status || 'partial',
+        seniority_level: d3.seniority_level || 'Not specified',
+        years_experience: d3.years_experience ?? 0,
+        core_strengths: Array.isArray(d3.core_strengths) ? d3.core_strengths : [],
+        within_industry: Array.isArray(d3.within_industry) ? d3.within_industry : [],
+        outside_industry: Array.isArray(d3.outside_industry) ? d3.outside_industry : [],
+        salary_benchmark: d3.salary_benchmark || {
+          role: targetRole || 'Target role',
+          location: candidateLocation || 'Canada',
+          range_cad: 'Not available',
+          notes: 'Insufficient information for a reliable benchmark.',
+        },
+        career_advice: d3.career_advice || 'Additional information is needed to provide more specific career guidance.',
+        questions: Array.isArray(d3.questions) ? d3.questions : [],
+      })
+
       setActiveTab('resume')
 
     } catch (err) { setError(err instanceof Error ? err.message : 'Something went wrong') }
@@ -419,21 +440,7 @@ export default function RecruiterTool() {
                     </div>
                   )}
 
-                  {activeTab === 'career' && analysis?.status === 'needs_more_information' && (
-                    <div className='rounded-xl border border-amber-200 bg-amber-50 p-5'>
-                      <h3 className='font-semibold text-amber-900'>More Information Needed</h3>
-                      <p className='mt-2 text-sm text-amber-800'>
-                        Please provide the following details to complete a reliable career analysis:
-                      </p>
-                      <ul className='mt-3 list-disc space-y-2 pl-5 text-sm text-amber-800'>
-                        {analysis.questions?.map((q, i) => (
-                          <li key={i}>{q}</li>
-                        ))}
-                      </ul>
-                    </div>
-                  )}
-
-                  {activeTab === 'career' && analysis && !analysis.error && analysis.status !== 'needs_more_information' && (
+                  {activeTab === 'career' && analysis && !analysis.error && (
                     <div className='space-y-6'>
                       {/* Header */}
                       <div className='rounded-xl bg-slate-900 p-4 text-white'>
@@ -510,6 +517,22 @@ export default function RecruiterTool() {
                         <h4 className='mb-2 text-sm font-semibold text-blue-800'>💡 Career Strategy Advice</h4>
                         <p className='text-sm text-blue-700'>{analysis.career_advice}</p>
                       </div>
+
+                      {analysis.questions && analysis.questions.length > 0 && (
+                        <div className='rounded-xl border border-amber-200 bg-amber-50 p-4'>
+                          <h4 className='mb-2 text-sm font-semibold text-amber-900'>
+                            More Information That Would Improve This Analysis
+                          </h4>
+                          <p className='mb-3 text-sm text-amber-800'>
+                            The analysis above is based on the information currently available. These details would help refine it further:
+                          </p>
+                          <ul className='list-disc space-y-2 pl-5 text-sm text-amber-800'>
+                            {analysis.questions.map((q, i) => (
+                              <li key={i}>{q}</li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>
