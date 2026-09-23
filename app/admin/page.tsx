@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { supabase } from '../../lib/supabase'
 
 type UsageLog = {
   id: string
@@ -23,12 +24,7 @@ type Summary = {
   by_day: Record<string, { calls: number; tokens: number; cost: number }>
 }
 
-const ADMIN_PASSWORD = 'talentseek2026'
-
 export default function AdminDashboard() {
-  const [password, setPassword] = useState('')
-  const [authenticated, setAuthenticated] = useState(false)
-  const [authError, setAuthError] = useState('')
   const [logs, setLogs] = useState<UsageLog[]>([])
   const [summary, setSummary] = useState<Summary | null>(null)
   const [isLoading, setIsLoading] = useState(false)
@@ -37,19 +33,19 @@ export default function AdminDashboard() {
 
   const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
 
-  const handleLogin = () => {
-    if (password === ADMIN_PASSWORD) {
-      setAuthenticated(true)
-      setAuthError('')
-    } else {
-      setAuthError('Incorrect password')
-    }
-  }
-
   const fetchUsage = async () => {
     setIsLoading(true); setError('')
     try {
-      const res = await fetch(`${API_URL}/admin/usage`)
+      const { data: sessionData } = await supabase.auth.getSession()
+      const token = sessionData.session?.access_token
+
+      if (!token) throw new Error('Please sign in again')
+
+      const res = await fetch(`${API_URL}/admin/usage`, {
+        headers: { Authorization: `Bearer ${token}` },
+      })
+
+      if (res.status === 403) throw new Error('Admin access required')
       if (!res.ok) throw new Error('Failed to fetch usage data')
       const data = await res.json()
       setLogs(data.logs || [])
@@ -60,34 +56,8 @@ export default function AdminDashboard() {
   }
 
   useEffect(() => {
-    if (authenticated) fetchUsage()
-  }, [authenticated])
-
-  if (!authenticated) {
-    return (
-      <main className='min-h-screen bg-slate-50 flex items-center justify-center px-6'>
-        <div className='w-full max-w-sm rounded-2xl bg-white p-8 shadow-sm'>
-          <div className='mb-6 text-center'>
-            <h1 className='text-2xl font-bold text-slate-900'>TalentSeek Admin</h1>
-            <p className='mt-2 text-sm text-slate-500'>Usage Dashboard</p>
-          </div>
-          <input
-            type='password'
-            value={password}
-            onChange={e => setPassword(e.target.value)}
-            onKeyDown={e => e.key === 'Enter' && handleLogin()}
-            placeholder='Enter admin password'
-            className='mb-3 w-full rounded-xl border border-slate-300 p-3 text-sm outline-none focus:border-slate-500'
-          />
-          {authError && <p className='mb-3 text-sm text-red-600'>{authError}</p>}
-          <button onClick={handleLogin}
-            className='w-full rounded-xl bg-slate-900 py-3 text-sm font-medium text-white hover:bg-slate-800'>
-            Sign In
-          </button>
-        </div>
-      </main>
-    )
-  }
+    fetchUsage()
+  }, [])
 
   const fmt = (n: number) => n.toLocaleString()
   const fmtCost = (n: number) => `$${n.toFixed(4)}`
@@ -164,7 +134,7 @@ export default function AdminDashboard() {
                   <div>
                     <div className='mb-1 flex justify-between text-sm'>
                       <span className='text-slate-600'>Input tokens</span>
-                      <span className='font-medium'>{fmt(summary.total_input)}</span>
+                      <span className='font-medium text-slate-900'>{fmt(summary.total_input)}</span>
                     </div>
                     <div className='h-2 rounded-full bg-slate-100'>
                       <div className='h-2 rounded-full bg-blue-400' style={{ width: `${(summary.total_input / summary.total_tokens) * 100}%` }} />
@@ -173,7 +143,7 @@ export default function AdminDashboard() {
                   <div>
                     <div className='mb-1 flex justify-between text-sm'>
                       <span className='text-slate-600'>Output tokens</span>
-                      <span className='font-medium'>{fmt(summary.total_output)}</span>
+                      <span className='font-medium text-slate-900'>{fmt(summary.total_output)}</span>
                     </div>
                     <div className='h-2 rounded-full bg-slate-100'>
                       <div className='h-2 rounded-full bg-emerald-400' style={{ width: `${(summary.total_output / summary.total_tokens) * 100}%` }} />
@@ -191,7 +161,7 @@ export default function AdminDashboard() {
                         {model.replace('claude-', '').replace('-20251001', '')}
                       </span>
                       <div className='text-right text-sm'>
-                        <span className='font-medium'>{fmtCost(data.cost)}</span>
+                        <span className='font-medium text-slate-900'>{fmtCost(data.cost)}</span>
                         <span className='ml-2 text-slate-400'>{fmt(data.calls)} calls</span>
                       </div>
                     </div>
@@ -237,7 +207,7 @@ export default function AdminDashboard() {
                         ].map(([label, value]) => (
                           <tr key={label}>
                             <td className='py-2 text-slate-600'>{label}</td>
-                            <td className='py-2 text-right font-medium'>{value}</td>
+                            <td className='py-2 text-right font-medium text-slate-900'>{value}</td>
                           </tr>
                         ))}
                       </tbody>

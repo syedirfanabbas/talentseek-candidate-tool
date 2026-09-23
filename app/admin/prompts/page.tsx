@@ -1,8 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-
-const ADMIN_PASSWORD = 'talentseek2026'
+import { supabase } from '../../../lib/supabase'
 
 const PROMPT_KEYS = [
   {
@@ -23,9 +22,6 @@ const PROMPT_GUIDES: Record<string, string[]> = {
 }
 
 export default function PromptEditor() {
-  const [password, setPassword] = useState('')
-  const [authenticated, setAuthenticated] = useState(false)
-  const [authError, setAuthError] = useState('')
 
   const [prompts, setPrompts] = useState<Record<string, string>>({})
   const [activeKey, setActiveKey] = useState('resume_prompt')
@@ -37,15 +33,19 @@ export default function PromptEditor() {
 
   const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
 
-  const handleLogin = () => {
-    if (password === ADMIN_PASSWORD) { setAuthenticated(true); setAuthError('') }
-    else setAuthError('Incorrect password')
-  }
-
   const fetchPrompts = async () => {
     setIsLoading(true)
     try {
-      const res = await fetch(`${API_URL}/admin/prompts`)
+      const { data: sessionData } = await supabase.auth.getSession()
+      const token = sessionData.session?.access_token
+
+      if (!token) throw new Error('Please sign in again')
+
+      const res = await fetch(`${API_URL}/admin/prompts`, {
+        headers: { Authorization: `Bearer ${token}` },
+      })
+
+      if (res.status === 403) throw new Error('Admin access required')
       if (!res.ok) throw new Error('Failed to fetch prompts')
       const data = await res.json()
       setPrompts(data)
@@ -56,8 +56,8 @@ export default function PromptEditor() {
   }
 
   useEffect(() => {
-    if (authenticated) fetchPrompts()
-  }, [authenticated])
+    fetchPrompts()
+  }, [])
 
   useEffect(() => {
     setEditContent(prompts[activeKey] || '')
@@ -72,11 +72,21 @@ export default function PromptEditor() {
   const handleSave = async () => {
     setIsSaving(true); setMessage(null)
     try {
+      const { data: sessionData } = await supabase.auth.getSession()
+      const token = sessionData.session?.access_token
+
+      if (!token) throw new Error('Please sign in again')
+
       const res = await fetch(`${API_URL}/admin/prompts`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
         body: JSON.stringify({ prompt_key: activeKey, content: editContent }),
       })
+
+      if (res.status === 403) throw new Error('Admin access required')
       const data = await res.json()
       if (data.success) {
         setPrompts(prev => ({ ...prev, [activeKey]: editContent }))
@@ -98,32 +108,6 @@ export default function PromptEditor() {
 
   const activePrompt = PROMPT_KEYS.find(p => p.key === activeKey)
 
-  if (!authenticated) {
-    return (
-      <main className='min-h-screen bg-slate-50 flex items-center justify-center px-6'>
-        <div className='w-full max-w-sm rounded-2xl bg-white p-8 shadow-sm'>
-          <div className='mb-6 text-center'>
-            <p className='text-xs font-medium uppercase tracking-widest text-slate-400 mb-2'>TalentSeek</p>
-            <h1 className='text-2xl font-bold text-slate-900'>Prompt Editor</h1>
-            <p className='mt-2 text-sm text-slate-500'>Admin access required</p>
-          </div>
-          <input type='password' value={password}
-            onChange={e => setPassword(e.target.value)}
-            onKeyDown={e => e.key === 'Enter' && handleLogin()}
-            placeholder='Enter admin password'
-            className='mb-3 w-full rounded-xl border border-slate-200 bg-white p-3 text-sm text-slate-900 placeholder:text-slate-400 outline-none focus:border-slate-500 shadow-sm' />
-          {authError && <p className='mb-3 text-sm text-red-600'>{authError}</p>}
-          <button onClick={handleLogin}
-            className='w-full rounded-xl bg-slate-900 py-3 text-sm font-medium text-white hover:bg-slate-800'>
-            Sign In
-          </button>
-          <p className='mt-4 text-center text-xs text-slate-400'>
-            <a href='/' className='hover:text-slate-600'>← Back to app</a>
-          </p>
-        </div>
-      </main>
-    )
-  }
 
   return (
     <main className='min-h-screen bg-slate-50'>
