@@ -5,6 +5,7 @@ import { LoadingSpinner } from '../components/LoadingSpinner'
 import { Document, Packer, Paragraph, TextRun, BorderStyle } from 'docx'
 import { saveAs } from 'file-saver'
 import jsPDF from 'jspdf'
+import { supabase } from '../../lib/supabase'
 
 const RECRUITER_PASSWORD = 'recruiter2026'
 
@@ -144,6 +145,16 @@ export default function RecruiterTool() {
 
   const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
 
+  const getAuthHeaders = async (): Promise<Record<string, string>> => {
+    const { data } = await supabase.auth.getSession()
+    const token = data.session?.access_token
+
+    return token
+      ? { Authorization: `Bearer ${token}` }
+      : {}
+  }
+
+
   const handleLogin = () => {
     if (password === RECRUITER_PASSWORD) { setAuthenticated(true); setAuthError('') }
     else setAuthError('Incorrect password')
@@ -153,7 +164,12 @@ export default function RecruiterTool() {
     setUploading(true); setError('')
     try {
       const fd = new FormData(); fd.append('file', file)
-      const res = await fetch(`${API_URL}/resumes/parse-demo`, { method: 'POST', body: fd })
+      const authHeaders = await getAuthHeaders()
+      const res = await fetch(`${API_URL}/resumes/parse-demo`, {
+        method: 'POST',
+        headers: authHeaders,
+        body: fd,
+      })
       if (!res.ok) throw new Error('Failed to parse file')
       const data = await res.json()
       if (data.text) setter(data.text)
@@ -172,8 +188,10 @@ export default function RecruiterTool() {
     try {
       // Step 1: Optimize resume
       setLoadingStep('Optimizing resume with recruiter instructions...')
+      const authHeaders = await getAuthHeaders()
       const r1 = await fetch(`${API_URL}/resumes/recruiter/optimize`, {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...authHeaders },
         body: JSON.stringify({
           resume_content: resume,
           job_description: jobDescription,
@@ -191,7 +209,8 @@ export default function RecruiterTool() {
       // Step 2: Generate feedback report
       setLoadingStep('Generating recruiter feedback report...')
       const r2 = await fetch(`${API_URL}/resumes/recruiter/feedback`, {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...authHeaders },
         body: JSON.stringify({
           original_resume: resume,
           optimized_resume: optimizedContent,
@@ -207,7 +226,8 @@ export default function RecruiterTool() {
       // Step 3: Career analysis
       setLoadingStep('Analyzing career opportunities and salary benchmarks...')
       const r3 = await fetch(`${API_URL}/resumes/recruiter/career-analysis`, {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...authHeaders },
         body: JSON.stringify({
           resume_content: optimizedContent,
           candidate_name: candidateName,

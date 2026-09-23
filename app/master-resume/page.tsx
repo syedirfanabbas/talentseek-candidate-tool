@@ -5,6 +5,7 @@ import { LoadingSpinner } from '../components/LoadingSpinner'
 import { Document, Packer, Paragraph, TextRun, BorderStyle } from 'docx'
 import { saveAs } from 'file-saver'
 import jsPDF from 'jspdf'
+import { supabase } from '../../lib/supabase'
 
 const MAX_RESUMES = 10
 
@@ -84,6 +85,16 @@ export default function MasterResume() {
 
   const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
 
+  const getAuthHeaders = async (): Promise<Record<string, string>> => {
+    const { data } = await supabase.auth.getSession()
+    const token = data.session?.access_token
+
+    return token
+      ? { Authorization: `Bearer ${token}` }
+      : {}
+  }
+
+
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const selected = Array.from(e.target.files || [])
     if (files.length + selected.length > MAX_RESUMES) {
@@ -97,7 +108,12 @@ export default function MasterResume() {
       try {
         const formData = new FormData()
         formData.append('file', file)
-        const res = await fetch(`${API_URL}/resumes/parse-demo`, { method: 'POST', body: formData })
+        const authHeaders = await getAuthHeaders()
+        const res = await fetch(`${API_URL}/resumes/parse-demo`, {
+          method: 'POST',
+          headers: authHeaders,
+          body: formData,
+        })
         if (!res.ok) throw new Error('Failed to parse ' + file.name)
         const data = await res.json()
         if (data.text) {
@@ -121,9 +137,10 @@ export default function MasterResume() {
     if (files.length < 2) { setError('Please upload at least 2 resumes to consolidate'); return }
     setIsLoading(true); setError(''); setMasterResume('')
     try {
+      const authHeaders = await getAuthHeaders()
       const res = await fetch(`${API_URL}/resumes/consolidate-demo`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...authHeaders },
         body: JSON.stringify({ resumes: files.map(f => f.text) }),
       })
       if (!res.ok) throw new Error('Consolidation failed')

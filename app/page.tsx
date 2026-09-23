@@ -189,12 +189,26 @@ export default function CandidateTool() {
     router.push('/auth')
   }
 
+  const getAuthHeaders = async (): Promise<Record<string, string>> => {
+    const { data } = await supabase.auth.getSession()
+    const token = data.session?.access_token
+
+    return token
+      ? { Authorization: `Bearer ${token}` }
+      : {}
+  }
+
   const parseFile = async (file: File, setter: (t: string) => void, setUploading: (b: boolean) => void) => {
     setUploading(true); setError('')
     try {
       const formData = new FormData()
       formData.append('file', file)
-      const res = await fetch(`${API_URL}/resumes/parse-demo`, { method: 'POST', body: formData })
+      const authHeaders = await getAuthHeaders()
+      const res = await fetch(`${API_URL}/resumes/parse-demo`, {
+        method: 'POST',
+        headers: authHeaders,
+        body: formData,
+      })
       if (!res.ok) throw new Error('Failed to parse file')
       const data = await res.json()
       if (data.text) { setter(data.text) } else { setError(data.error || 'Could not extract text') }
@@ -219,8 +233,10 @@ export default function CandidateTool() {
         ? 'LENGTH: Keep to 2 pages. Balance detail with conciseness.'
         : 'LENGTH: Detailed resume, 3+ pages. Include comprehensive experience and achievements.'
 
+      const authHeaders = await getAuthHeaders()
       const res = await fetch(`${API_URL}/resumes/optimize-demo`, {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...authHeaders },
         body: JSON.stringify({
           content: resume,
           job_description: jobDescription + '\n\n' + lengthInstruction,
@@ -232,8 +248,10 @@ export default function CandidateTool() {
 
       setIsAnalyzing(true)
       try {
+        const authHeaders = await getAuthHeaders()
         const aRes = await fetch(`${API_URL}/resumes/analyze-demo`, {
-          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', ...authHeaders },
           body: JSON.stringify({ resume_content: data.optimized_content, job_description: jobDescription }),
         })
         if (aRes.ok) setAnalysis(await aRes.json())
