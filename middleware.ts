@@ -51,6 +51,26 @@ export async function middleware(req: NextRequest) {
     return NextResponse.redirect(url)
   }
 
+  if (user) {
+    const role = user.app_metadata?.role
+
+    if (pathname.startsWith('/admin') && role !== 'admin') {
+      const url = req.nextUrl.clone()
+      url.pathname = '/'
+      return NextResponse.redirect(url)
+    }
+
+    if (
+      pathname.startsWith('/recruiter') &&
+      role !== 'recruiter' &&
+      role !== 'admin'
+    ) {
+      const url = req.nextUrl.clone()
+      url.pathname = '/'
+      return NextResponse.redirect(url)
+    }
+  }
+
   return response
 }
 
