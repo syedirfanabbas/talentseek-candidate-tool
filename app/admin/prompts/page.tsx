@@ -7,7 +7,7 @@ const PROMPT_KEYS = [
   {
     key: 'resume_prompt',
     label: 'Resume Optimization Prompt',
-    description: 'Controls how Claude rewrites and formats resumes. This is the full resume_prompt.py file.',
+    description: 'Controls how Claude rewrites and formats resumes. This prompt is stored securely in Supabase.',
     color: 'blue',
   },
 ]
@@ -166,7 +166,7 @@ export default function PromptEditor() {
 
               <div className='mt-4 rounded-xl bg-amber-50 border border-amber-200 p-3'>
                 <p className='text-xs font-semibold text-amber-800 mb-1'>⚠️ Important</p>
-                <p className='text-xs text-amber-700'>Changes save to the server file immediately and affect all future optimizations. Test after saving.</p>
+                <p className='text-xs text-amber-700'>Changes save to Supabase immediately and affect all future optimizations. Test after saving.</p>
               </div>
             </div>
           </div>
