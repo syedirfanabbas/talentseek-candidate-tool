@@ -29,6 +29,13 @@ const choices = [
     href: 'https://talentseek.ca/contact/',
     category: 'Work with an expert',
   },
+  {
+    title: 'Prepare for an Interview',
+    description: 'Create a practical interview plan with likely questions, preparation priorities, and questions to ask.',
+    action: 'Prepare for an interview',
+    href: '/interview-prep',
+    category: 'Get ready to interview',
+  },
 ]
 
 export default function DashboardPage() {
@@ -100,7 +107,7 @@ export default function DashboardPage() {
           <p className='mt-5 text-lg leading-8 text-slate-600'>Start with your experience, prepare for a specific role, or get support from a recruiter.</p>
         </div>
 
-        <div className='mt-10 grid gap-6 md:grid-cols-3'>
+        <div className='mt-10 grid gap-6 md:grid-cols-2 xl:grid-cols-4'>
           {choices.map(choice => (
             <section key={choice.href} className='flex flex-col rounded-2xl border border-slate-200 bg-white p-7 shadow-sm'>
               <p className='text-xs font-semibold uppercase tracking-wider text-teal-700'>{choice.category}</p>
