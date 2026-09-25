@@ -5,6 +5,7 @@ import { FormEvent, useEffect, useState } from 'react'
 import { supabase } from '../../lib/supabase'
 
 type Application = { id: string; company_name: string; role_title: string; job_url?: string; status: string; notes?: string }
+type RecruiterRequest = { id: string; target_role: string; notes?: string; status: string }
 
 const choices = [
   {
@@ -37,6 +38,10 @@ export default function DashboardPage() {
   const [status, setStatus] = useState('saved')
   const [isLoading, setIsLoading] = useState(true)
   const [isSaving, setIsSaving] = useState(false)
+  const [requests, setRequests] = useState<RecruiterRequest[]>([])
+  const [targetRole, setTargetRole] = useState('')
+  const [requestNotes, setRequestNotes] = useState('')
+  const [isRequesting, setIsRequesting] = useState(false)
   const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
 
   async function authHeaders(): Promise<Record<string, string>> {
@@ -51,6 +56,16 @@ export default function DashboardPage() {
   }
 
   useEffect(() => { void loadApplications() }, [])
+  useEffect(() => { void (async () => { const response = await fetch(`${API_URL}/recruiter-requests`, { headers: await authHeaders() }); if (response.ok) setRequests(await response.json()) })() }, [])
+
+  async function submitRecruiterRequest(event: FormEvent) {
+    event.preventDefault()
+    if (!targetRole.trim()) return
+    setIsRequesting(true)
+    const response = await fetch(`${API_URL}/recruiter-requests`, { method: 'POST', headers: { 'Content-Type': 'application/json', ...await authHeaders() }, body: JSON.stringify({ target_role: targetRole.trim(), notes: requestNotes.trim() || undefined }) })
+    if (response.ok) { setRequests([await response.json(), ...requests]); setTargetRole(''); setRequestNotes('') }
+    setIsRequesting(false)
+  }
 
   async function addApplication(event: FormEvent) {
     event.preventDefault()
@@ -115,6 +130,18 @@ export default function DashboardPage() {
             {!isLoading && applications.length === 0 && <p className='rounded-xl bg-slate-50 p-4 text-sm text-slate-500'>No applications yet. Add your first one above.</p>}
             {applications.map(application => <div key={application.id} className='flex flex-wrap items-center gap-3 rounded-xl border border-slate-200 p-4'><div className='min-w-[180px] flex-1'><p className='font-semibold text-slate-900'>{application.role_title}</p><p className='text-sm text-slate-500'>{application.company_name}</p></div><select value={application.status} onChange={e => void changeStatus(application, e.target.value)} aria-label={`Status for ${application.role_title}`} className='rounded-lg border border-slate-300 px-2 py-1 text-sm text-slate-700'><option value='saved'>Saved</option><option value='applied'>Applied</option><option value='interview'>Interview</option><option value='offer'>Offer</option><option value='closed'>Closed</option></select><button onClick={() => void removeApplication(application.id)} className='text-sm text-slate-500 hover:text-red-700'>Remove</button></div>)}
           </div>
+        </section>
+
+        <section className='mt-8 rounded-2xl border border-slate-200 bg-white p-7 shadow-sm'>
+          <p className='text-xs font-semibold uppercase tracking-wider text-teal-700'>Work with an expert</p>
+          <h2 className='mt-2 text-2xl font-bold text-slate-900'>Request recruiter help</h2>
+          <p className='mt-2 text-slate-600'>Tell us which role you are targeting and a recruiter will review your resume.</p>
+          <form onSubmit={submitRecruiterRequest} className='mt-6 grid gap-3'>
+            <input value={targetRole} onChange={e => setTargetRole(e.target.value)} placeholder='Target role' aria-label='Target role' className='rounded-xl border border-slate-300 px-3 py-2 text-sm text-slate-900' />
+            <textarea value={requestNotes} onChange={e => setRequestNotes(e.target.value)} placeholder='What would you like help with? (optional)' aria-label='Recruiter request notes' className='min-h-24 rounded-xl border border-slate-300 px-3 py-2 text-sm text-slate-900' />
+            <button disabled={isRequesting} className='w-fit rounded-xl bg-slate-900 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50'>{isRequesting ? 'Submitting…' : 'Request recruiter review'}</button>
+          </form>
+          <div className='mt-6 space-y-3'>{requests.map(request => <div key={request.id} className='rounded-xl border border-slate-200 p-4'><p className='font-semibold text-slate-900'>{request.target_role}</p><p className='text-sm capitalize text-slate-500'>{request.status.replace('_', ' ')}</p></div>)}</div>
         </section>
       </div>
     </main>
