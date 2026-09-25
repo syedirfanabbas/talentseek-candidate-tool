@@ -1,0 +1,18 @@
+const APP_ORIGIN = 'https://app.talentseek.ca'
+const APP_PATHS = new Set(['/', '/dashboard', '/master-resume', '/admin', '/admin/prompts', '/recruiter'])
+
+// Only return to existing app pages. Never redirect to an external URL or auth itself.
+export function safeReturnTo(value: string | null | undefined): string {
+  if (!value || !value.startsWith('/') || value.startsWith('//') || /[\\\u0000-\u0020]/.test(value)) return '/dashboard'
+  try {
+    const url = new URL(value, APP_ORIGIN)
+    if (url.origin !== APP_ORIGIN || !APP_PATHS.has(url.pathname)) return '/dashboard'
+    return url.pathname + url.search + url.hash
+  } catch {
+    return '/dashboard'
+  }
+}
+
+export function signInUrl(destination: string): string {
+  return `/auth?${new URLSearchParams({ next: safeReturnTo(destination) })}`
+}
