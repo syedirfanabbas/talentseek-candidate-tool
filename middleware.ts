@@ -1,6 +1,7 @@
 import { createServerClient } from '@supabase/ssr'
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
+import { safeReturnTo, signInUrl } from './lib/navigation'
 
 export async function middleware(req: NextRequest) {
   let response = NextResponse.next({
@@ -39,25 +40,26 @@ export async function middleware(req: NextRequest) {
   const pathname = req.nextUrl.pathname
   const isAuthPage = pathname === '/auth'
 
+  // Preserve refreshed/cleared session cookies when returning a redirect.
+  const redirectTo = (destination: string) => {
+    const redirect = NextResponse.redirect(new URL(destination, req.url))
+    response.cookies.getAll().forEach(cookie => redirect.cookies.set(cookie))
+    return redirect
+  }
+
   if (!user && !isAuthPage) {
-    const url = req.nextUrl.clone()
-    url.pathname = '/auth'
-    return NextResponse.redirect(url)
+    return redirectTo(signInUrl(pathname + req.nextUrl.search))
   }
 
   if (user && isAuthPage) {
-    const url = req.nextUrl.clone()
-    url.pathname = '/'
-    return NextResponse.redirect(url)
+    return redirectTo(safeReturnTo(req.nextUrl.searchParams.get('next')))
   }
 
   if (user) {
     const role = user.app_metadata?.role
 
     if (pathname.startsWith('/admin') && role !== 'admin') {
-      const url = req.nextUrl.clone()
-      url.pathname = '/'
-      return NextResponse.redirect(url)
+      return redirectTo('/dashboard')
     }
 
     if (
@@ -65,9 +67,7 @@ export async function middleware(req: NextRequest) {
       role !== 'recruiter' &&
       role !== 'admin'
     ) {
-      const url = req.nextUrl.clone()
-      url.pathname = '/'
-      return NextResponse.redirect(url)
+      return redirectTo('/dashboard')
     }
   }
 
@@ -75,5 +75,5 @@ export async function middleware(req: NextRequest) {
 }
 
 export const config = {
-  matcher: ['/((?!_next/static|_next/image|favicon.ico).*)'],
+  matcher: ['/', '/auth', '/dashboard', '/master-resume/:path*', '/admin/:path*', '/recruiter/:path*'],
 }

@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { supabase } from '../../lib/supabase'
-import { useRouter } from 'next/navigation'
+import { safeReturnTo } from '../../lib/navigation'
 
 export default function AuthPage() {
   const [mode, setMode] = useState<'login' | 'register'>('login')
@@ -11,9 +11,10 @@ export default function AuthPage() {
   const [name, setName] = useState('')
   const [isLoading, setIsLoading] = useState(false)
   const [message, setMessage] = useState<{ text: string; type: 'success' | 'error' } | null>(null)
-  const router = useRouter()
 
   const handleSubmit = async () => {
+    if (isLoading) return
+    const destination = safeReturnTo(new URLSearchParams(window.location.search).get('next'))
     if (!email.trim() || !password.trim()) {
       setMessage({ text: 'Please enter your email and password', type: 'error' })
       return
@@ -32,19 +33,23 @@ export default function AuthPage() {
 
     try {
       if (mode === 'register') {
-        const { error } = await supabase.auth.signUp({
+        const { data, error } = await supabase.auth.signUp({
           email,
           password,
           options: { data: { full_name: name } }
         })
         if (error) throw error
+        if (data.session) {
+          window.location.replace(destination)
+          return
+        }
         setMessage({ text: 'Account created! Please check your email to confirm your account, then log in.', type: 'success' })
         setMode('login')
       } else {
-        const { data, error } = await supabase.auth.signInWithPassword({ email, password })
+        const { error } = await supabase.auth.signInWithPassword({ email, password })
         if (error) throw error
         setMessage({ text: 'Login successful! Redirecting...', type: 'success' })
-        setTimeout(() => { window.location.href = '/' }, 1000)
+        window.location.replace(destination)
       }
     } catch (err: any) {
       setMessage({ text: err.message || 'Something went wrong', type: 'error' })

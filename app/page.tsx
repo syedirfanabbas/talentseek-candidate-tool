@@ -2,7 +2,6 @@
 
 import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
-import { useRouter } from 'next/navigation'
 import { LoadingSpinner } from './components/LoadingSpinner'
 import {
   Document, Packer, Paragraph, TextRun, BorderStyle,
@@ -178,17 +177,11 @@ export default function CandidateTool() {
   const [resumeLength, setResumeLength] = useState('2')
 
   const [user, setUser] = useState<any>(null)
-  const router = useRouter()
   const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data }) => setUser(data.user))
   }, [])
-
-  const handleLogout = async () => {
-    await supabase.auth.signOut()
-    router.push('/auth')
-  }
 
   const getAuthHeaders = async (): Promise<Record<string, string>> => {
     const { data } = await supabase.auth.getSession()
@@ -401,11 +394,11 @@ export default function CandidateTool() {
           <p className='mt-3 text-slate-600'>AI Resume Optimization Tool</p>
           <div className='mt-2 flex items-center justify-center gap-4 text-xs text-slate-400'>
             {user && <span>{user.email}</span>}
-            <button onClick={handleLogout} className='rounded-lg border border-slate-200 px-3 py-1 text-slate-500 hover:border-slate-400 hover:text-slate-700'>
-              Sign Out
-            </button>
           </div>
-          <a href='/master-resume' className='mt-3 inline-block rounded-lg border border-slate-300 px-4 py-1.5 text-sm text-slate-600 hover:border-slate-500 hover:text-slate-900'>
+          <a href='/dashboard' className='mt-3 inline-block rounded-lg border border-slate-300 px-4 py-1.5 text-sm text-slate-600 hover:border-slate-500 hover:text-slate-900'>
+            ← What would you like to do today?
+          </a>
+          <a href='/master-resume' className='mt-3 ml-3 inline-block rounded-lg border border-slate-300 px-4 py-1.5 text-sm text-slate-600 hover:border-slate-500 hover:text-slate-900'>
             📋 Build Master Resume
           </a>
         </div>

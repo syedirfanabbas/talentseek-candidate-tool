@@ -218,7 +218,7 @@ export default function MasterResume() {
         </div>
 
         <div className='mb-4'>
-          <a href='/' className='text-sm text-slate-500 hover:text-slate-700'>← Back to Resume Optimizer</a>
+          <a href='/dashboard' className='text-sm text-slate-500 hover:text-slate-700'>← Back to What would you like to do?</a>
         </div>
 
         <div className='grid gap-8 lg:grid-cols-2'>
