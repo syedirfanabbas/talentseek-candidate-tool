@@ -293,7 +293,7 @@ export default function RecruiterTool() {
             <h1 className='text-3xl font-bold text-slate-900'>Recruiter Console</h1>
             <p className='mt-1 text-sm text-slate-500'>Resume Consultation · Career Analysis · Feedback Reports</p>
           </div>
-          <div className='flex gap-2'><a href='/recruiter/requests' className='rounded-xl bg-slate-900 px-4 py-2 text-sm text-white hover:bg-slate-700'>Candidate requests</a><a href='/dashboard' className='rounded-xl border border-slate-300 px-4 py-2 text-sm text-slate-600 hover:bg-slate-100'>← Dashboard</a></div>
+          <div className='flex gap-2'><a href='/recruiter/requests' className='rounded-xl bg-slate-900 px-4 py-2 text-sm text-white hover:bg-slate-700'>Candidate requests</a><a href='/recruiter/dashboard' className='rounded-xl border border-slate-300 px-4 py-2 text-sm text-slate-600 hover:bg-slate-100'>← Recruiter home</a></div>
         </div>
 
         <div className='grid gap-8 lg:grid-cols-5'>

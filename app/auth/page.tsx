@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { supabase } from '../../lib/supabase'
-import { safeReturnTo } from '../../lib/navigation'
+import { defaultDestinationForRole, safeReturnTo } from '../../lib/navigation'
 
 export default function AuthPage() {
   const [mode, setMode] = useState<'login' | 'register'>('login')
@@ -14,7 +14,8 @@ export default function AuthPage() {
 
   const handleSubmit = async () => {
     if (isLoading) return
-    const destination = safeReturnTo(new URLSearchParams(window.location.search).get('next'))
+    const next = new URLSearchParams(window.location.search).get('next')
+    const destination = next ? safeReturnTo(next) : '/dashboard'
     if (!email.trim() || !password.trim()) {
       setMessage({ text: 'Please enter your email and password', type: 'error' })
       return
@@ -46,10 +47,10 @@ export default function AuthPage() {
         setMessage({ text: 'Account created! Please check your email to confirm your account, then log in.', type: 'success' })
         setMode('login')
       } else {
-        const { error } = await supabase.auth.signInWithPassword({ email, password })
+        const { data, error } = await supabase.auth.signInWithPassword({ email, password })
         if (error) throw error
         setMessage({ text: 'Login successful! Redirecting...', type: 'success' })
-        window.location.replace(destination)
+        window.location.replace(next ? destination : defaultDestinationForRole(data.user?.app_metadata?.role))
       }
     } catch (err: any) {
       setMessage({ text: err.message || 'Something went wrong', type: 'error' })

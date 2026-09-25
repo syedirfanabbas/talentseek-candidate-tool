@@ -19,7 +19,7 @@ function loadModule(file, overrides = {}) {
 }
 
 const navigation = loadModule('lib/navigation.ts')
-const { safeReturnTo, signInUrl } = navigation
+const { defaultDestinationForRole, safeReturnTo, signInUrl } = navigation
 
 async function request(route, user = null, refreshCookies = false) {
   const { middleware } = loadModule('middleware.ts', {
@@ -41,7 +41,7 @@ async function request(route, user = null, refreshCookies = false) {
 }
 
 test('return destinations preserve supported paths, queries and anchors', () => {
-  for (const destination of ['/', '/dashboard', '/master-resume', '/master-resume?source=jobs&job=123#experience', '/admin/prompts', '/recruiter']) {
+  for (const destination of ['/', '/dashboard', '/master-resume', '/master-resume?source=jobs&job=123#experience', '/admin/prompts', '/recruiter', '/recruiter/dashboard', '/recruiter/requests']) {
     assert.equal(safeReturnTo(destination), destination)
     assert.equal(new URL(signInUrl(destination), 'https://app.talentseek.ca').searchParams.get('next'), destination)
   }
@@ -64,9 +64,12 @@ test('anonymous deep links survive the sign-in round trip', async () => {
   assert.equal(signedIn.headers.get('location'), `https://app.talentseek.ca${destination}`)
 })
 
-test('general sign-in opens the chooser while explicit optimizer links stay direct', async () => {
+test('general sign-in opens the appropriate workspace while explicit links stay direct', async () => {
   const user = { app_metadata: {} }
   assert.equal((await request('/auth', user)).headers.get('location'), 'https://app.talentseek.ca/dashboard')
+  assert.equal(defaultDestinationForRole('recruiter'), '/recruiter/dashboard')
+  assert.equal(defaultDestinationForRole('admin'), '/recruiter/dashboard')
+  assert.equal((await request('/auth', { app_metadata: { role: 'recruiter' } })).headers.get('location'), 'https://app.talentseek.ca/recruiter/dashboard')
   assert.equal((await request('/auth?next=%2F', user)).headers.get('location'), 'https://app.talentseek.ca/')
   const response = await request('/dashboard')
   assert.equal(new URL(response.headers.get('location')).searchParams.get('next'), '/dashboard')
@@ -88,9 +91,11 @@ test('signed-in auth requests reject external destinations and auth loops', asyn
 test('role restrictions remain enforced after returning from login', async () => {
   for (const [role, route, allowed] of [
     ['candidate', '/admin', false], ['candidate', '/admin/prompts', false],
-    ['candidate', '/recruiter', false], ['recruiter', '/admin', false],
-    ['recruiter', '/recruiter', true], ['admin', '/admin/prompts', true],
-    ['admin', '/recruiter', true],
+    ['candidate', '/recruiter', false], ['candidate', '/recruiter/dashboard', false],
+    ['candidate', '/recruiter/requests', false], ['recruiter', '/admin', false],
+    ['recruiter', '/recruiter', true], ['recruiter', '/recruiter/dashboard', true],
+    ['recruiter', '/recruiter/requests', true], ['admin', '/admin/prompts', true],
+    ['admin', '/recruiter', true], ['admin', '/recruiter/dashboard', true],
   ]) {
     const response = await request(route, { app_metadata: { role } })
     assert.equal(response.status, allowed ? 200 : 307, `${role}: ${route}`)

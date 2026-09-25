@@ -1,7 +1,7 @@
 import { createServerClient } from '@supabase/ssr'
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
-import { safeReturnTo, signInUrl } from './lib/navigation'
+import { defaultDestinationForRole, safeReturnTo, signInUrl } from './lib/navigation'
 
 export async function middleware(req: NextRequest) {
   let response = NextResponse.next({
@@ -52,7 +52,8 @@ export async function middleware(req: NextRequest) {
   }
 
   if (user && isAuthPage) {
-    return redirectTo(safeReturnTo(req.nextUrl.searchParams.get('next')))
+    const next = req.nextUrl.searchParams.get('next')
+    return redirectTo(next ? safeReturnTo(next) : defaultDestinationForRole(user.app_metadata?.role))
   }
 
   if (user) {

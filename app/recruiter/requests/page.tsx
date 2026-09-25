@@ -12,7 +12,7 @@ export default function RecruiterRequestsPage() {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState<string | null>(null)
 
-  async function headers() {
+  async function headers(): Promise<Record<string, string>> {
     const { data } = await supabase.auth.getSession()
     return data.session ? { Authorization: `Bearer ${data.session.access_token}` } : {}
   }

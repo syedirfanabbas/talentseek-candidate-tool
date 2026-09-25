@@ -1,5 +1,9 @@
 const APP_ORIGIN = 'https://app.talentseek.ca'
-const APP_PATHS = new Set(['/', '/dashboard', '/master-resume', '/admin', '/admin/prompts', '/recruiter'])
+const APP_PATHS = new Set(['/', '/dashboard', '/master-resume', '/admin', '/admin/prompts', '/recruiter', '/recruiter/dashboard', '/recruiter/requests'])
+
+export function defaultDestinationForRole(role: string | undefined): string {
+  return role === 'recruiter' || role === 'admin' ? '/recruiter/dashboard' : '/dashboard'
+}
 
 // Only return to existing app pages. Never redirect to an external URL or auth itself.
 export function safeReturnTo(value: string | null | undefined): string {
