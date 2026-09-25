@@ -3,7 +3,6 @@ import Link from 'next/link'
 const tools = [
   { title: 'Master Resume Builder', text: 'Build and refine a complete candidate resume before tailoring it for specific roles.', href: '/master-resume', action: 'Open master resume builder' },
   { title: 'Enhance Resume Optimization', text: 'Use the recruiter workspace to optimize a candidate resume with recruiter instructions.', href: '/recruiter', action: 'Open resume optimization' },
-  { title: 'Career Analysis', text: 'Generate career direction, role-fit, and salary analysis from the recruiter workspace.', href: '/recruiter', action: 'Open career analysis' },
   { title: 'Candidate Request Queue', text: 'Review incoming candidate requests, update their status, and provide feedback.', href: '/recruiter/requests', action: 'Open request queue' },
 ]
 

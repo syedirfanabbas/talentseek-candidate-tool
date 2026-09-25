@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { LoadingSpinner } from '../components/LoadingSpinner'
 import { Document, Packer, Paragraph, TextRun, BorderStyle } from 'docx'
 import { saveAs } from 'file-saver'
@@ -82,8 +82,16 @@ export default function MasterResume() {
   const [isLoading, setIsLoading] = useState(false)
   const [uploadingIndex, setUploadingIndex] = useState<number | null>(null)
   const [error, setError] = useState('')
+  const [isRecruiter, setIsRecruiter] = useState(false)
 
   const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
+
+  useEffect(() => {
+    supabase.auth.getUser().then(({ data }) => {
+      const role = data.user?.app_metadata?.role
+      setIsRecruiter(role === 'recruiter' || role === 'admin')
+    })
+  }, [])
 
   const getAuthHeaders = async (): Promise<Record<string, string>> => {
     const { data } = await supabase.auth.getSession()
@@ -218,7 +226,7 @@ export default function MasterResume() {
         </div>
 
         <div className='mb-4'>
-          <a href='/dashboard' className='text-sm text-slate-500 hover:text-slate-700'>← Back to What would you like to do?</a>
+          <a href={isRecruiter ? '/recruiter/dashboard' : '/dashboard'} className='text-sm text-slate-500 hover:text-slate-700'>← Back to {isRecruiter ? 'Recruiter Home' : 'What would you like to do?'}</a>
         </div>
 
         <div className='grid gap-8 lg:grid-cols-2'>
