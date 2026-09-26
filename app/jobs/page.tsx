@@ -15,11 +15,17 @@ export default function JobsPage() {
 
   async function load(search = '') {
     setLoading(true)
-    const response = await fetch(`${API_URL}/jobs/search?${new URLSearchParams(search ? { query: search } : {})}`)
-    const data = await response.json().catch(() => ({ jobs: [] }))
-    setJobs(data.jobs || [])
-    setNotice(data.source_error || null)
-    setLoading(false)
+    try {
+      const response = await fetch(`/api/jobs/search?${new URLSearchParams(search ? { query: search } : {})}`)
+      const data = await response.json().catch(() => ({ jobs: [] }))
+      setJobs(data.jobs || [])
+      setNotice(data.source_error || (response.ok ? null : 'Jobs are temporarily unavailable. Please try again shortly.'))
+    } catch {
+      setJobs([])
+      setNotice('Jobs are temporarily unavailable. Please try again shortly.')
+    } finally {
+      setLoading(false)
+    }
   }
   useEffect(() => { void load() }, [])
 
