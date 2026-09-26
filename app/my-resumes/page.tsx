@@ -3,6 +3,9 @@
 import Link from 'next/link'
 import { useEffect, useState } from 'react'
 import { supabase } from '../../lib/supabase'
+import { Document, Packer, Paragraph, TextRun } from 'docx'
+import { saveAs } from 'file-saver'
+import jsPDF from 'jspdf'
 
 type MasterResume = { id: string; content: string; updated_at: string }
 type OptimizedResume = { id: string; title: string; content: string; job_title?: string; company_name?: string; created_at: string }
@@ -14,6 +17,31 @@ function downloadText(filename: string, content: string) {
   link.download = `${filename.replace(/[^a-z0-9]+/gi, '-').replace(/^-|-$/g, '')}.txt`
   link.click()
   URL.revokeObjectURL(link.href)
+}
+
+async function downloadDocx(filename: string, content: string) {
+  const document = new Document({ sections: [{ children: content.split('\n').map(line => new Paragraph({ children: [new TextRun({ text: line || ' ' })] })) }] })
+  saveAs(await Packer.toBlob(document), `${filename.replace(/[^a-z0-9]+/gi, '-').replace(/^-|-$/g, '')}.docx`)
+}
+
+function downloadPdf(filename: string, content: string) {
+  const pdf = new jsPDF({ unit: 'pt', format: 'letter' })
+  const margin = 54
+  const lineHeight = 14
+  const width = pdf.internal.pageSize.getWidth() - margin * 2
+  const height = pdf.internal.pageSize.getHeight() - margin
+  let y = margin
+  pdf.setFont('helvetica', 'normal')
+  pdf.setFontSize(10)
+  content.split('\n').forEach(line => {
+    const lines = pdf.splitTextToSize(line || ' ', width)
+    lines.forEach((wrapped: string) => {
+      if (y + lineHeight > height) { pdf.addPage(); y = margin }
+      pdf.text(wrapped, margin, y)
+      y += lineHeight
+    })
+  })
+  pdf.save(`${filename.replace(/[^a-z0-9]+/gi, '-').replace(/^-|-$/g, '')}.pdf`)
 }
 
 export default function MyResumesPage() {
@@ -77,7 +105,7 @@ export default function MyResumesPage() {
     {error && <p role='alert' className='mt-6 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700'>{error}</p>}
     {loading ? <p className='mt-10 text-slate-500'>Loading saved resumes…</p> : <div className='mt-10 space-y-8'>
       <section><div className='flex items-center justify-between'><h2 className='text-2xl font-bold text-slate-900'>Master Resume</h2>{master && <span className='text-sm text-slate-500'>Updated {new Date(master.updated_at).toLocaleDateString()}</span>}</div>{master ? <article className='mt-4 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm'><p className='text-slate-600'>Your complete career record, ready to tailor for future roles.</p><div className='mt-5 flex flex-wrap gap-3'><button onClick={() => setSelected({ title: 'Master Resume', content: master.content })} className='rounded-xl bg-slate-900 px-4 py-2 text-sm font-semibold text-white'>View resume</button><button onClick={() => downloadText('master-resume', master.content)} className='rounded-xl border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700'>Download text</button><Link href='/master-resume' className='rounded-xl border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700'>Open builder</Link><button onClick={() => void deleteMaster()} className='rounded-xl px-4 py-2 text-sm font-semibold text-red-700 hover:bg-red-50'>Delete</button></div></article> : <article className='mt-4 rounded-2xl border border-dashed border-slate-300 bg-white p-6 text-slate-600'>No saved master resume yet. <Link href='/master-resume' className='font-semibold text-slate-900 underline'>Build and save one now.</Link></article>}</section>
-      <section><div className='flex items-center justify-between'><h2 className='text-2xl font-bold text-slate-900'>Optimized Resumes</h2><Link href='/' className='text-sm font-semibold text-slate-700 underline'>Optimize a new resume</Link></div>{optimized.length === 0 ? <article className='mt-4 rounded-2xl border border-dashed border-slate-300 bg-white p-6 text-slate-600'>No optimized resumes saved yet.</article> : <div className='mt-4 space-y-4'>{optimized.map(resume => <article key={resume.id} className='rounded-2xl border border-slate-200 bg-white p-6 shadow-sm'>{editingId === resume.id ? <div className='flex flex-wrap gap-2'><input autoFocus value={title} onChange={event => setTitle(event.target.value)} className='min-w-60 flex-1 rounded-lg border border-slate-300 px-3 py-2 text-slate-900' /><button onClick={() => void rename(resume)} className='rounded-lg bg-slate-900 px-3 py-2 text-sm font-semibold text-white'>Save</button><button onClick={() => setEditingId(null)} className='rounded-lg px-3 py-2 text-sm text-slate-600'>Cancel</button></div> : <><div className='flex flex-wrap items-start justify-between gap-3'><div><h3 className='text-lg font-bold text-slate-900'>{resume.title}</h3><p className='mt-1 text-sm text-slate-500'>{[resume.job_title, resume.company_name].filter(Boolean).join(' · ') || 'Optimized resume'} · Saved {new Date(resume.created_at).toLocaleDateString()}</p></div></div><div className='mt-5 flex flex-wrap gap-3'><button onClick={() => setSelected({ title: resume.title, content: resume.content })} className='rounded-xl bg-slate-900 px-4 py-2 text-sm font-semibold text-white'>View resume</button><button onClick={() => downloadText(resume.title, resume.content)} className='rounded-xl border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700'>Download text</button><button onClick={() => { setEditingId(resume.id); setTitle(resume.title) }} className='rounded-xl border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700'>Rename</button><button onClick={() => void deleteOptimized(resume)} className='rounded-xl px-4 py-2 text-sm font-semibold text-red-700 hover:bg-red-50'>Delete</button></div></>}</article>)}</div>}</section>
+      <section><div className='flex items-center justify-between'><h2 className='text-2xl font-bold text-slate-900'>Optimized Resumes</h2><Link href='/' className='text-sm font-semibold text-slate-700 underline'>Optimize a new resume</Link></div>{optimized.length === 0 ? <article className='mt-4 rounded-2xl border border-dashed border-slate-300 bg-white p-6 text-slate-600'>No optimized resumes saved yet.</article> : <div className='mt-4 space-y-4'>{optimized.map(resume => <article key={resume.id} className='rounded-2xl border border-slate-200 bg-white p-6 shadow-sm'>{editingId === resume.id ? <div className='flex flex-wrap gap-2'><input autoFocus value={title} onChange={event => setTitle(event.target.value)} className='min-w-60 flex-1 rounded-lg border border-slate-300 px-3 py-2 text-slate-900' /><button onClick={() => void rename(resume)} className='rounded-lg bg-slate-900 px-3 py-2 text-sm font-semibold text-white'>Save</button><button onClick={() => setEditingId(null)} className='rounded-lg px-3 py-2 text-sm text-slate-600'>Cancel</button></div> : <><div className='flex flex-wrap items-start justify-between gap-3'><div><h3 className='text-lg font-bold text-slate-900'>{resume.title}</h3><p className='mt-1 text-sm text-slate-500'>{[resume.job_title, resume.company_name].filter(Boolean).join(' · ') || 'Optimized resume'} · Saved {new Date(resume.created_at).toLocaleDateString()}</p></div></div><div className='mt-5 flex flex-wrap gap-3'><button onClick={() => setSelected({ title: resume.title, content: resume.content })} className='rounded-xl bg-slate-900 px-4 py-2 text-sm font-semibold text-white'>View resume</button><button onClick={() => void downloadDocx(resume.title, resume.content)} className='rounded-xl border border-blue-300 bg-blue-50 px-4 py-2 text-sm font-semibold text-blue-700'>Download Word</button><button onClick={() => downloadPdf(resume.title, resume.content)} className='rounded-xl border border-red-300 bg-red-50 px-4 py-2 text-sm font-semibold text-red-700'>Download PDF</button><button onClick={() => { setEditingId(resume.id); setTitle(resume.title) }} className='rounded-xl border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700'>Rename</button><button onClick={() => void deleteOptimized(resume)} className='rounded-xl px-4 py-2 text-sm font-semibold text-red-700 hover:bg-red-50'>Delete</button></div></>}</article>)}</div>}</section>
     </div>}
     {selected && <div role='dialog' aria-modal='true' aria-label={selected.title} className='fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 p-6'><div className='max-h-[85vh] w-full max-w-4xl overflow-auto rounded-2xl bg-white p-6 shadow-xl'><div className='flex items-center justify-between gap-4'><h2 className='text-xl font-bold text-slate-900'>{selected.title}</h2><button onClick={() => setSelected(null)} className='rounded-lg px-3 py-2 text-sm text-slate-600 hover:bg-slate-100'>Close</button></div><pre className='mt-5 whitespace-pre-wrap rounded-xl bg-slate-50 p-4 text-sm leading-6 text-slate-800'>{selected.content}</pre></div></div>}
   </div></main>
