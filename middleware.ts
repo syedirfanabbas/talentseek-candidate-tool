@@ -53,11 +53,12 @@ export async function middleware(req: NextRequest) {
 
   if (user && isAuthPage) {
     const next = req.nextUrl.searchParams.get('next')
-    return redirectTo(next ? safeReturnTo(next) : defaultDestinationForRole(user.app_metadata?.role))
+    return redirectTo(next ? safeReturnTo(next) : defaultDestinationForRole(user.app_metadata?.role, user.user_metadata?.account_type))
   }
 
   if (user) {
     const role = user.app_metadata?.role
+    const accountType = user.user_metadata?.account_type
 
     if (pathname.startsWith('/admin') && role !== 'admin') {
       return redirectTo('/dashboard')
@@ -67,6 +68,15 @@ export async function middleware(req: NextRequest) {
       pathname.startsWith('/recruiter') &&
       role !== 'recruiter' &&
       role !== 'admin'
+    ) {
+      return redirectTo('/dashboard')
+    }
+
+    if (
+      pathname.startsWith('/employer') &&
+      role !== 'admin' &&
+      role !== 'employer' &&
+      accountType !== 'employer'
     ) {
       return redirectTo('/dashboard')
     }

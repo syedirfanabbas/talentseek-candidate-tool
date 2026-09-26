@@ -9,6 +9,7 @@ export default function AuthPage() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [name, setName] = useState('')
+  const [accountType, setAccountType] = useState<'candidate' | 'employer'>('candidate')
   const [isLoading, setIsLoading] = useState(false)
   const [message, setMessage] = useState<{ text: string; type: 'success' | 'error' } | null>(null)
 
@@ -37,11 +38,11 @@ export default function AuthPage() {
         const { data, error } = await supabase.auth.signUp({
           email,
           password,
-          options: { data: { full_name: name } }
+          options: { data: { full_name: name, account_type: accountType } }
         })
         if (error) throw error
         if (data.session) {
-          window.location.replace(destination)
+          window.location.replace(defaultDestinationForRole(undefined, accountType))
           return
         }
         setMessage({ text: 'Account created! Please check your email to confirm your account, then log in.', type: 'success' })
@@ -50,7 +51,7 @@ export default function AuthPage() {
         const { data, error } = await supabase.auth.signInWithPassword({ email, password })
         if (error) throw error
         setMessage({ text: 'Login successful! Redirecting...', type: 'success' })
-        window.location.replace(next ? destination : defaultDestinationForRole(data.user?.app_metadata?.role))
+        window.location.replace(next ? destination : defaultDestinationForRole(data.user?.app_metadata?.role, data.user?.user_metadata?.account_type))
       }
     } catch (err: any) {
       setMessage({ text: err.message || 'Something went wrong', type: 'error' })
@@ -95,12 +96,29 @@ export default function AuthPage() {
           {/* Form */}
           <div className='space-y-4'>
             {mode === 'register' && (
-              <div>
-                <label className='mb-1 block text-sm font-medium text-slate-700'>Full Name</label>
-                <input value={name} onChange={e => setName(e.target.value)}
-                  placeholder='John Smith'
-                  className='w-full rounded-xl border border-slate-200 bg-white p-3 text-sm text-slate-900 placeholder:text-slate-400 outline-none focus:border-slate-500' />
-              </div>
+              <>
+                <fieldset>
+                  <legend className='mb-2 block text-sm font-medium text-slate-700'>I am creating an account as</legend>
+                  <div className='grid grid-cols-2 gap-3'>
+                    <button type='button' onClick={() => setAccountType('candidate')} aria-pressed={accountType === 'candidate'}
+                      className={`rounded-xl border p-3 text-left transition-colors ${accountType === 'candidate' ? 'border-teal-600 bg-teal-50 text-teal-950' : 'border-slate-200 text-slate-700 hover:border-slate-400'}`}>
+                      <span className='block text-sm font-semibold'>Candidate</span>
+                      <span className='mt-1 block text-xs leading-5'>Find jobs and improve my resume</span>
+                    </button>
+                    <button type='button' onClick={() => setAccountType('employer')} aria-pressed={accountType === 'employer'}
+                      className={`rounded-xl border p-3 text-left transition-colors ${accountType === 'employer' ? 'border-teal-600 bg-teal-50 text-teal-950' : 'border-slate-200 text-slate-700 hover:border-slate-400'}`}>
+                      <span className='block text-sm font-semibold'>Employer</span>
+                      <span className='mt-1 block text-xs leading-5'>Post and manage job opportunities</span>
+                    </button>
+                  </div>
+                </fieldset>
+                <div>
+                  <label className='mb-1 block text-sm font-medium text-slate-700'>Full Name</label>
+                  <input value={name} onChange={e => setName(e.target.value)}
+                    placeholder='John Smith'
+                    className='w-full rounded-xl border border-slate-200 bg-white p-3 text-sm text-slate-900 placeholder:text-slate-400 outline-none focus:border-slate-500' />
+                </div>
+              </>
             )}
             <div>
               <label className='mb-1 block text-sm font-medium text-slate-700'>Email</label>
@@ -128,7 +146,7 @@ export default function AuthPage() {
 
           <button onClick={handleSubmit} disabled={isLoading}
             className='mt-6 w-full rounded-xl bg-slate-900 py-3 text-sm font-semibold text-white hover:bg-slate-800 disabled:opacity-50'>
-            {isLoading ? 'Please wait...' : mode === 'login' ? 'Sign In' : 'Create Free Account'}
+            {isLoading ? 'Please wait...' : mode === 'login' ? 'Sign In' : accountType === 'employer' ? 'Create Employer Account' : 'Create Candidate Account'}
           </button>
 
           {mode === 'register' && (

@@ -69,6 +69,7 @@ test('general sign-in opens the appropriate workspace while explicit links stay 
   assert.equal((await request('/auth', user)).headers.get('location'), 'https://app.talentseek.ca/dashboard')
   assert.equal(defaultDestinationForRole('recruiter'), '/recruiter/dashboard')
   assert.equal(defaultDestinationForRole('admin'), '/admin/dashboard')
+  assert.equal(defaultDestinationForRole(undefined, 'employer'), '/employer/jobs/new')
   assert.equal((await request('/auth', { app_metadata: { role: 'recruiter' } })).headers.get('location'), 'https://app.talentseek.ca/recruiter/dashboard')
   assert.equal((await request('/auth', { app_metadata: { role: 'admin' } })).headers.get('location'), 'https://app.talentseek.ca/admin/dashboard')
   assert.equal((await request('/auth?next=%2F', user)).headers.get('location'), 'https://app.talentseek.ca/')
@@ -101,6 +102,12 @@ test('role restrictions remain enforced after returning from login', async () =>
     const response = await request(route, { app_metadata: { role } })
     assert.equal(response.status, allowed ? 200 : 307, `${role}: ${route}`)
   }
+})
+
+test('only employer accounts and admins can open employer tools', async () => {
+  assert.equal((await request('/employer/jobs/new', { app_metadata: {}, user_metadata: { account_type: 'candidate' } })).status, 307)
+  assert.equal((await request('/employer/jobs/new', { app_metadata: {}, user_metadata: { account_type: 'employer' } })).status, 200)
+  assert.equal((await request('/employer/jobs/new', { app_metadata: { role: 'admin' }, user_metadata: {} })).status, 200)
 })
 
 test('refreshed session cookies are preserved on every redirect branch', async () => {
