@@ -38,6 +38,7 @@ export function AppNavigation() {
         {(role === 'admin'
           ? [
               { href: '/admin/dashboard', label: 'Admin Home' },
+              { href: '/admin/jobs', label: 'Job Postings' },
               { href: '/admin', label: 'Koen Usage Report' },
               { href: '/admin/prompts', label: 'Prompt Editor' },
             ]
