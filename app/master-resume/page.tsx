@@ -83,12 +83,22 @@ export default function MasterResume() {
   const [uploadingIndex, setUploadingIndex] = useState<number | null>(null)
   const [error, setError] = useState('')
   const [role, setRole] = useState('candidate')
+  const [isSaving, setIsSaving] = useState(false)
+  const [saveMessage, setSaveMessage] = useState('')
 
   const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data }) => {
       setRole(data.user?.app_metadata?.role || 'candidate')
+    })
+    supabase.auth.getSession().then(async ({ data }) => {
+      if (!data.session) return
+      const response = await fetch(`${API_URL}/resume-library/master`, { headers: { Authorization: `Bearer ${data.session.access_token}` } })
+      if (response.ok) {
+        const saved = await response.json()
+        if (saved?.content) { setMasterResume(saved.content); setSaveMessage('Loaded your saved master resume.') }
+      }
     })
   }, [])
 
@@ -156,6 +166,20 @@ export default function MasterResume() {
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Something went wrong')
     } finally { setIsLoading(false) }
+  }
+
+  const saveMasterResume = async () => {
+    if (!masterResume.trim()) return
+    setIsSaving(true); setSaveMessage('')
+    try {
+      const response = await fetch(`${API_URL}/resume-library/master`, {
+        method: 'PUT', headers: { 'Content-Type': 'application/json', ...await getAuthHeaders() },
+        body: JSON.stringify({ content: masterResume }),
+      })
+      if (!response.ok) throw new Error('Unable to save your master resume.')
+      setSaveMessage('Master resume saved securely to your account.')
+    } catch (saveError) { setSaveMessage(saveError instanceof Error ? saveError.message : 'Unable to save your master resume.') }
+    setIsSaving(false)
   }
 
   const downloadDocx = async () => {
@@ -317,6 +341,10 @@ export default function MasterResume() {
                 <div className='mb-3 flex items-center justify-between'>
                   <h3 className='font-semibold text-slate-800'>Your Master Resume</h3>
                   <div className='flex gap-2'>
+                    <button onClick={saveMasterResume} disabled={isSaving}
+                      className='rounded-lg border border-emerald-300 bg-emerald-50 px-3 py-1.5 text-xs font-medium text-emerald-700 hover:bg-emerald-100 disabled:opacity-50'>
+                      {isSaving ? 'Saving…' : 'Save to account'}
+                    </button>
                     <button onClick={downloadDocx}
                       className='rounded-lg border border-blue-300 bg-blue-50 px-3 py-1.5 text-xs font-medium text-blue-700 hover:bg-blue-100'>
                       📥 Word
@@ -327,6 +355,7 @@ export default function MasterResume() {
                     </button>
                   </div>
                 </div>
+                {saveMessage && <p className='mb-3 text-xs text-slate-500'>{saveMessage}</p>}
                 <pre className='max-h-[600px] overflow-y-auto whitespace-pre-wrap rounded-xl bg-slate-100 p-4 text-sm text-slate-800'>{masterResume}</pre>
               </div>
             )}
