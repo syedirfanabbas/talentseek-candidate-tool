@@ -36,6 +36,13 @@ const choices = [
     href: '/interview-prep',
     category: 'Get ready to interview',
   },
+  {
+    title: 'My Resumes',
+    description: 'Open and manage your saved master resume and optimized resume versions.',
+    action: 'View my resumes',
+    href: '/my-resumes',
+    category: 'Keep your work organised',
+  },
 ]
 
 export default function DashboardPage() {

@@ -41,7 +41,7 @@ async function request(route, user = null, refreshCookies = false) {
 }
 
 test('return destinations preserve supported paths, queries and anchors', () => {
-  for (const destination of ['/', '/dashboard', '/master-resume', '/master-resume?source=jobs&job=123#experience', '/interview-prep', '/admin/dashboard', '/admin/prompts', '/recruiter', '/recruiter/dashboard', '/recruiter/requests']) {
+  for (const destination of ['/', '/dashboard', '/master-resume', '/master-resume?source=jobs&job=123#experience', '/my-resumes', '/interview-prep', '/admin/dashboard', '/admin/prompts', '/recruiter', '/recruiter/dashboard', '/recruiter/requests']) {
     assert.equal(safeReturnTo(destination), destination)
     assert.equal(new URL(signInUrl(destination), 'https://app.talentseek.ca').searchParams.get('next'), destination)
   }

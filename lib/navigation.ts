@@ -1,5 +1,5 @@
 const APP_ORIGIN = 'https://app.talentseek.ca'
-const APP_PATHS = new Set(['/', '/dashboard', '/master-resume', '/interview-prep', '/admin', '/admin/dashboard', '/admin/prompts', '/recruiter', '/recruiter/dashboard', '/recruiter/requests'])
+const APP_PATHS = new Set(['/', '/dashboard', '/master-resume', '/my-resumes', '/interview-prep', '/admin', '/admin/dashboard', '/admin/prompts', '/recruiter', '/recruiter/dashboard', '/recruiter/requests'])
 
 export function defaultDestinationForRole(role: string | undefined): string {
   if (role === 'admin') return '/admin/dashboard'
