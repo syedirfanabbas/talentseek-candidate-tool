@@ -189,7 +189,7 @@ export default function AdminDashboard() {
                 {activeTab === 'overview' && (
                   <div className='space-y-3'>
                     <h3 className='font-semibold text-slate-800 mb-4'>Usage Summary</h3>
-                    <table className='w-full text-sm'>
+                    <table className='w-full text-sm text-slate-900'>
                       <thead>
                         <tr className='border-b border-slate-200 text-left text-slate-500'>
                           <th className='pb-2'>Metric</th>
@@ -218,7 +218,7 @@ export default function AdminDashboard() {
                 {activeTab === 'models' && (
                   <div>
                     <h3 className='font-semibold text-slate-800 mb-4'>Usage by Model</h3>
-                    <table className='w-full text-sm'>
+                    <table className='w-full text-sm text-slate-900'>
                       <thead>
                         <tr className='border-b border-slate-200 text-left text-slate-500'>
                           <th className='pb-2'>Model</th>
@@ -250,7 +250,7 @@ export default function AdminDashboard() {
                 {activeTab === 'endpoints' && (
                   <div>
                     <h3 className='font-semibold text-slate-800 mb-4'>Usage by Endpoint</h3>
-                    <table className='w-full text-sm'>
+                    <table className='w-full text-sm text-slate-900'>
                       <thead>
                         <tr className='border-b border-slate-200 text-left text-slate-500'>
                           <th className='pb-2'>Endpoint</th>
@@ -276,7 +276,7 @@ export default function AdminDashboard() {
                 {activeTab === 'daily' && (
                   <div>
                     <h3 className='font-semibold text-slate-800 mb-4'>Daily Usage</h3>
-                    <table className='w-full text-sm'>
+                    <table className='w-full text-sm text-slate-900'>
                       <thead>
                         <tr className='border-b border-slate-200 text-left text-slate-500'>
                           <th className='pb-2'>Date</th>
@@ -303,7 +303,7 @@ export default function AdminDashboard() {
                   <div>
                     <h3 className='font-semibold text-slate-800 mb-4'>Recent API Calls</h3>
                     <div className='overflow-x-auto'>
-                      <table className='w-full text-sm'>
+                      <table className='w-full text-sm text-slate-900'>
                         <thead>
                           <tr className='border-b border-slate-200 text-left text-slate-500'>
                             <th className='pb-2'>Time</th>
