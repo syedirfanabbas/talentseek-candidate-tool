@@ -9,12 +9,11 @@ export function AppNavigation() {
   const pathname = usePathname()
   const [signingOut, setSigningOut] = useState(false)
   const [error, setError] = useState('')
-  const [isRecruiter, setIsRecruiter] = useState(pathname.startsWith('/recruiter'))
+  const [role, setRole] = useState(pathname.startsWith('/admin') ? 'admin' : pathname.startsWith('/recruiter') ? 'recruiter' : 'candidate')
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data }) => {
-      const role = data.user?.app_metadata?.role
-      setIsRecruiter(role === 'recruiter' || role === 'admin')
+      setRole(data.user?.app_metadata?.role || 'candidate')
     })
   }, [])
 
@@ -36,7 +35,13 @@ export function AppNavigation() {
     <nav aria-label='Main navigation' className='border-b border-slate-200 bg-white px-6 py-4'>
       <div className='mx-auto flex max-w-6xl flex-wrap items-center gap-x-6 gap-y-3 text-sm'>
         <a href='https://talentseek.ca' className='font-bold text-slate-900'>TalentSeek.ca</a>
-        {(isRecruiter
+        {(role === 'admin'
+          ? [
+              { href: '/admin/dashboard', label: 'Admin Home' },
+              { href: '/admin', label: 'Koen Usage Report' },
+              { href: '/admin/prompts', label: 'Prompt Editor' },
+            ]
+          : role === 'recruiter'
           ? [
               { href: '/recruiter/dashboard', label: 'Recruiter Home' },
               { href: '/recruiter', label: 'Enhance Resume Optimization' },

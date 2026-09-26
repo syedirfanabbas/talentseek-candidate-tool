@@ -395,8 +395,8 @@ export default function CandidateTool() {
           <div className='mt-2 flex items-center justify-center gap-4 text-xs text-slate-400'>
             {user && <span>{user.email}</span>}
           </div>
-          <a href='/dashboard' className='mt-3 inline-block rounded-lg border border-slate-300 px-4 py-1.5 text-sm text-slate-600 hover:border-slate-500 hover:text-slate-900'>
-            ← What would you like to do today?
+          <a href={user?.app_metadata?.role === 'admin' ? '/admin/dashboard' : user?.app_metadata?.role === 'recruiter' ? '/recruiter/dashboard' : '/dashboard'} className='mt-3 inline-block rounded-lg border border-slate-300 px-4 py-1.5 text-sm text-slate-600 hover:border-slate-500 hover:text-slate-900'>
+            ← {user?.app_metadata?.role === 'admin' ? 'Admin Home' : user?.app_metadata?.role === 'recruiter' ? 'Recruiter Home' : 'What would you like to do today?'}
           </a>
           <a href='/master-resume' className='mt-3 ml-3 inline-block rounded-lg border border-slate-300 px-4 py-1.5 text-sm text-slate-600 hover:border-slate-500 hover:text-slate-900'>
             📋 Build Master Resume

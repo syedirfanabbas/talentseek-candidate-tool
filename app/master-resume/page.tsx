@@ -82,14 +82,13 @@ export default function MasterResume() {
   const [isLoading, setIsLoading] = useState(false)
   const [uploadingIndex, setUploadingIndex] = useState<number | null>(null)
   const [error, setError] = useState('')
-  const [isRecruiter, setIsRecruiter] = useState(false)
+  const [role, setRole] = useState('candidate')
 
   const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data }) => {
-      const role = data.user?.app_metadata?.role
-      setIsRecruiter(role === 'recruiter' || role === 'admin')
+      setRole(data.user?.app_metadata?.role || 'candidate')
     })
   }, [])
 
@@ -226,7 +225,7 @@ export default function MasterResume() {
         </div>
 
         <div className='mb-4'>
-          <a href={isRecruiter ? '/recruiter/dashboard' : '/dashboard'} className='text-sm text-slate-500 hover:text-slate-700'>← Back to {isRecruiter ? 'Recruiter Home' : 'What would you like to do?'}</a>
+          <a href={role === 'admin' ? '/admin/dashboard' : role === 'recruiter' ? '/recruiter/dashboard' : '/dashboard'} className='text-sm text-slate-500 hover:text-slate-700'>← Back to {role === 'admin' ? 'Admin Home' : role === 'recruiter' ? 'Recruiter Home' : 'What would you like to do?'}</a>
         </div>
 
         <div className='grid gap-8 lg:grid-cols-2'>

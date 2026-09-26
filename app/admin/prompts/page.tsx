@@ -122,8 +122,8 @@ export default function PromptEditor() {
             <a href='/admin' className='rounded-xl border border-slate-300 px-4 py-2 text-sm text-slate-600 hover:bg-slate-50'>
               Usage Dashboard
             </a>
-            <a href='/' className='rounded-xl border border-slate-300 px-4 py-2 text-sm text-slate-600 hover:bg-slate-50'>
-              ← Back to App
+            <a href='/admin/dashboard' className='rounded-xl border border-slate-300 px-4 py-2 text-sm text-slate-600 hover:bg-slate-50'>
+              ← Admin Home
             </a>
           </div>
         </div>

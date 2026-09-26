@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { LoadingSpinner } from '../components/LoadingSpinner'
 import { Document, Packer, Paragraph, TextRun, BorderStyle } from 'docx'
 import { saveAs } from 'file-saver'
@@ -120,6 +120,8 @@ const fitColor = (fit: string) =>
   : 'bg-yellow-100 text-yellow-700 border-yellow-200'
 
 export default function RecruiterTool() {
+  const [isAdmin, setIsAdmin] = useState(false)
+  useEffect(() => { supabase.auth.getUser().then(({ data }) => setIsAdmin(data.user?.app_metadata?.role === 'admin')) }, [])
   const [candidateName, setCandidateName] = useState('')
   const [candidateLocation, setCandidateLocation] = useState('')
   const [targetRole, setTargetRole] = useState('')
@@ -293,7 +295,7 @@ export default function RecruiterTool() {
             <h1 className='text-3xl font-bold text-slate-900'>Recruiter Console</h1>
             <p className='mt-1 text-sm text-slate-500'>Resume Consultation · Career Analysis · Feedback Reports</p>
           </div>
-          <div className='flex gap-2'><a href='/recruiter/requests' className='rounded-xl bg-slate-900 px-4 py-2 text-sm text-white hover:bg-slate-700'>Candidate requests</a><a href='/recruiter/dashboard' className='rounded-xl border border-slate-300 px-4 py-2 text-sm text-slate-600 hover:bg-slate-100'>← Recruiter home</a></div>
+          <div className='flex gap-2'><a href='/recruiter/requests' className='rounded-xl bg-slate-900 px-4 py-2 text-sm text-white hover:bg-slate-700'>Candidate requests</a><a href={isAdmin ? '/admin/dashboard' : '/recruiter/dashboard'} className='rounded-xl border border-slate-300 px-4 py-2 text-sm text-slate-600 hover:bg-slate-100'>← {isAdmin ? 'Admin home' : 'Recruiter home'}</a></div>
         </div>
 
         <div className='grid gap-8 lg:grid-cols-5'>

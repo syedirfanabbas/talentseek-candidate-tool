@@ -89,9 +89,9 @@ export default function AdminDashboard() {
               className='rounded-xl border border-slate-300 px-4 py-2 text-sm text-slate-700 hover:bg-slate-100'>
               🎯 Recruiter Console
             </a>
-            <a href='/'
+            <a href='/admin/dashboard'
               className='rounded-xl border border-slate-300 px-4 py-2 text-sm text-slate-700 hover:bg-slate-100'>
-              ← Back to App
+              ← Admin Home
             </a>
           </div>
         </div>
