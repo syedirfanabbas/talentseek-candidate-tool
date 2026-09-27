@@ -108,6 +108,7 @@ test('only employer accounts and admins can open employer tools', async () => {
   assert.equal((await request('/employer/jobs/new', { app_metadata: {}, user_metadata: { account_type: 'candidate' } })).status, 307)
   assert.equal((await request('/employer/jobs/new', { app_metadata: {}, user_metadata: { account_type: 'employer' } })).status, 200)
   assert.equal((await request('/employer/jobs/new', { app_metadata: { role: 'admin' }, user_metadata: {} })).status, 200)
+  assert.equal((await request('/dashboard', { app_metadata: {}, user_metadata: { account_type: 'employer' } })).headers.get('location'), 'https://app.talentseek.ca/employer/jobs/new')
 })
 
 test('refreshed session cookies are preserved on every redirect branch', async () => {

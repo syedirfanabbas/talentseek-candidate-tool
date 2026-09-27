@@ -60,6 +60,13 @@ export async function middleware(req: NextRequest) {
     const role = user.app_metadata?.role
     const accountType = user.user_metadata?.account_type
 
+    if (
+      pathname === '/dashboard' &&
+      (role === 'employer' || accountType === 'employer')
+    ) {
+      return redirectTo('/employer/jobs/new')
+    }
+
     if (pathname.startsWith('/admin') && role !== 'admin') {
       return redirectTo('/dashboard')
     }

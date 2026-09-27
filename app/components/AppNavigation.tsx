@@ -9,11 +9,12 @@ export function AppNavigation() {
   const pathname = usePathname()
   const [signingOut, setSigningOut] = useState(false)
   const [error, setError] = useState('')
-  const [role, setRole] = useState(pathname.startsWith('/admin') ? 'admin' : pathname.startsWith('/recruiter') ? 'recruiter' : 'candidate')
+  const [role, setRole] = useState(pathname.startsWith('/admin') ? 'admin' : pathname.startsWith('/recruiter') ? 'recruiter' : pathname.startsWith('/employer') ? 'employer' : 'candidate')
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data }) => {
-      setRole(data.user?.app_metadata?.role || 'candidate')
+      const protectedRole = data.user?.app_metadata?.role
+      setRole(protectedRole || (data.user?.user_metadata?.account_type === 'employer' ? 'employer' : 'candidate'))
     })
   }, [])
 
@@ -47,6 +48,11 @@ export function AppNavigation() {
               { href: '/recruiter/dashboard', label: 'Recruiter Home' },
               { href: '/recruiter', label: 'Enhance Resume Optimization' },
               { href: '/master-resume', label: 'Master Resume Builder' },
+            ]
+          : role === 'employer'
+          ? [
+              { href: '/employer/jobs/new', label: 'Post a Job' },
+              { href: '/jobs', label: 'View Job Board' },
             ]
           : [
               { href: '/dashboard', label: 'Home' },
