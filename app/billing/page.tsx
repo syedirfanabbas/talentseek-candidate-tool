@@ -5,7 +5,8 @@ import { supabase } from '../../lib/supabase'
 
 type BillingSummary = {
   entitlement: { plan_key: string; subscription_status: string; subscription_period_end?: string | null }
-  available: { resume_optimizations: number; interview_prep_packs: number }
+  available: { resume_optimizations: number | null; interview_prep_packs: number | null }
+  unlimited: boolean
   orders: Array<{ id: string; product_key: string; status: string; currency: string; amount_minor: number; created_at: string }>
   checkout_enabled: boolean
 }
@@ -40,9 +41,9 @@ export default function BillingPage() {
 
         {error && <p role='alert' className='mt-6 rounded-xl bg-red-50 p-4 text-red-800'>{error}</p>}
         <section className='mt-8 grid gap-4 sm:grid-cols-3' aria-label='Current usage'>
-          <div className='rounded-2xl border border-slate-200 bg-white p-6 shadow-sm'><p className='text-sm text-slate-500'>Current plan</p><p className='mt-2 text-2xl font-bold capitalize text-slate-900'>{summary?.entitlement.plan_key || 'Free'}</p></div>
-          <div className='rounded-2xl border border-slate-200 bg-white p-6 shadow-sm'><p className='text-sm text-slate-500'>Resume optimizations remaining</p><p className='mt-2 text-3xl font-bold text-slate-900'>{summary?.available.resume_optimizations ?? '—'}</p></div>
-          <div className='rounded-2xl border border-slate-200 bg-white p-6 shadow-sm'><p className='text-sm text-slate-500'>Interview packs remaining</p><p className='mt-2 text-3xl font-bold text-slate-900'>{summary?.available.interview_prep_packs ?? '—'}</p></div>
+          <div className='rounded-2xl border border-slate-200 bg-white p-6 shadow-sm'><p className='text-sm text-slate-500'>Current plan</p><p className='mt-2 text-2xl font-bold capitalize text-slate-900'>{summary?.unlimited ? 'Founding member' : summary?.entitlement.plan_key || 'Free'}</p></div>
+          <div className='rounded-2xl border border-slate-200 bg-white p-6 shadow-sm'><p className='text-sm text-slate-500'>Resume optimizations remaining</p><p className='mt-2 text-3xl font-bold text-slate-900'>{summary ? (summary.unlimited ? 'Unlimited' : summary.available.resume_optimizations) : '—'}</p></div>
+          <div className='rounded-2xl border border-slate-200 bg-white p-6 shadow-sm'><p className='text-sm text-slate-500'>Interview packs remaining</p><p className='mt-2 text-3xl font-bold text-slate-900'>{summary ? (summary.unlimited ? 'Unlimited' : summary.available.interview_prep_packs) : '—'}</p></div>
         </section>
 
         <section className='mt-12'>
