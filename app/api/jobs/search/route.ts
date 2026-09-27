@@ -7,7 +7,9 @@ const backendUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
 export async function GET(request: Request) {
   const url = new URL('/jobs/search', backendUrl)
   const query = new URL(request.url).searchParams.get('query')?.trim()
+  const location = new URL(request.url).searchParams.get('location')?.trim()
   if (query) url.searchParams.set('query', query)
+  if (location) url.searchParams.set('location', location)
 
   try {
     const response = await fetch(url, { cache: 'no-store' })
