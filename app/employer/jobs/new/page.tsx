@@ -18,6 +18,7 @@ export default function PostAJobPage() {
     setMessage(null)
     setIsError(false)
     const form = new FormData(formElement)
+    const closingDate = form.get('expires_at')?.toString()
 
     try {
       const { data } = await supabase.auth.getSession()
@@ -33,6 +34,7 @@ export default function PostAJobPage() {
           company_name: form.get('company_name'), title: form.get('title'), location: form.get('location'),
           work_mode: form.get('work_mode'), employment_type: form.get('employment_type'),
           description: form.get('description'), application_url: form.get('application_url'), salary_text: form.get('salary_text') || undefined,
+          expires_at: closingDate ? new Date(`${closingDate}T23:59:59`).toISOString() : undefined,
         }),
       })
 
@@ -58,7 +60,7 @@ export default function PostAJobPage() {
     <header className='mt-7'><p className='text-sm font-semibold uppercase tracking-widest text-teal-700'>For employers</p><h1 className='mt-2 text-4xl font-bold tracking-tight text-slate-900'>Post an open role.</h1><p className='mt-3 max-w-xl leading-7 text-slate-600'>Submit a role that links candidates to your official application page. We review each posting before it is published.</p></header>
     <form onSubmit={submit} className='mt-8 space-y-5 rounded-2xl border border-slate-200 bg-white p-7 shadow-sm'>
       <div className='grid gap-5 sm:grid-cols-2'><label className='text-sm font-semibold text-slate-700'>Company name<input required name='company_name' className='mt-2 w-full rounded-xl border border-slate-300 px-3 py-2.5 font-normal text-slate-900' /></label><label className='text-sm font-semibold text-slate-700'>Job title<input required name='title' className='mt-2 w-full rounded-xl border border-slate-300 px-3 py-2.5 font-normal text-slate-900' /></label><label className='text-sm font-semibold text-slate-700'>Location<input required name='location' placeholder='Toronto, ON or Canada' className='mt-2 w-full rounded-xl border border-slate-300 px-3 py-2.5 font-normal text-slate-900' /></label><label className='text-sm font-semibold text-slate-700'>Salary range <span className='font-normal text-slate-400'>(optional)</span><input name='salary_text' placeholder='C$80,000–C$100,000' className='mt-2 w-full rounded-xl border border-slate-300 px-3 py-2.5 font-normal text-slate-900' /></label><label className='text-sm font-semibold text-slate-700'>Work style<select name='work_mode' className='mt-2 w-full rounded-xl border border-slate-300 px-3 py-2.5 font-normal text-slate-900'><option value='hybrid'>Hybrid</option><option value='remote'>Remote</option><option value='on_site'>On-site</option></select></label><label className='text-sm font-semibold text-slate-700'>Employment type<select name='employment_type' className='mt-2 w-full rounded-xl border border-slate-300 px-3 py-2.5 font-normal text-slate-900'><option value='full_time'>Full-time</option><option value='part_time'>Part-time</option><option value='contract'>Contract</option><option value='temporary'>Temporary</option><option value='internship'>Internship</option></select></label></div>
-      <label className='block text-sm font-semibold text-slate-700'>Official application URL<input required type='url' name='application_url' placeholder='https://company.com/careers/job' className='mt-2 w-full rounded-xl border border-slate-300 px-3 py-2.5 font-normal text-slate-900' /></label>
+      <div className='grid gap-5 sm:grid-cols-2'><label className='text-sm font-semibold text-slate-700'>Closing date <span className='font-normal text-slate-400'>(optional)</span><input type='date' name='expires_at' min={new Date().toISOString().slice(0, 10)} className='mt-2 w-full rounded-xl border border-slate-300 px-3 py-2.5 font-normal text-slate-900' /></label><label className='text-sm font-semibold text-slate-700'>Official application URL<input required type='url' name='application_url' placeholder='https://company.com/careers/job' className='mt-2 w-full rounded-xl border border-slate-300 px-3 py-2.5 font-normal text-slate-900' /></label></div>
       <label className='block text-sm font-semibold text-slate-700'>Job description<textarea required name='description' minLength={80} rows={9} className='mt-2 w-full rounded-xl border border-slate-300 px-3 py-2.5 font-normal leading-6 text-slate-900' placeholder='Describe responsibilities, qualifications, and what makes this role a good opportunity.' /></label>
       {message && <p role='status' className={`rounded-xl px-4 py-3 text-sm ${isError ? 'bg-red-50 text-red-800' : 'bg-teal-50 text-teal-900'}`}>{message}</p>}
       <button type='submit' disabled={saving} className='w-full rounded-xl bg-slate-900 px-4 py-3 font-semibold text-white disabled:cursor-wait disabled:opacity-60'>{saving ? 'Submitting…' : 'Submit for review'}</button>

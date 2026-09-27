@@ -47,6 +47,12 @@ test('return destinations preserve supported paths, queries and anchors', () => 
   }
 })
 
+test('published job detail links survive the sign-in round trip', () => {
+  const jobPath = '/jobs/123e4567-e89b-42d3-a456-426614174000'
+  assert.equal(safeReturnTo(jobPath), jobPath)
+  assert.equal(safeReturnTo('/jobs/not-a-job-id'), '/dashboard')
+})
+
 test('external URLs, auth loops, unknown routes and malformed destinations fall back safely', () => {
   for (const destination of [null, '', 'https://evil.example', '//evil.example', '/\\evil.example', '/\nevil.example', 'javascript:alert(1)', '/auth', '/auth?next=/auth', '/missing', '/%2f%2fevil.example', '/master-resume/../auth']) {
     assert.equal(safeReturnTo(destination), '/dashboard', String(destination))

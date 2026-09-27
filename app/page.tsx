@@ -183,6 +183,11 @@ export default function CandidateTool() {
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data }) => setUser(data.user))
+    const storedJobDescription = sessionStorage.getItem('talentseek-job-description')
+    if (storedJobDescription) {
+      setJobDescription(storedJobDescription)
+      sessionStorage.removeItem('talentseek-job-description')
+    }
   }, [])
 
   const getAuthHeaders = async (): Promise<Record<string, string>> => {
