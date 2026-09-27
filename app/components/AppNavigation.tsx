@@ -30,7 +30,7 @@ export function AppNavigation() {
       setSigningOut(false)
     }
   }
-  if (pathname === '/auth') return null
+  if (pathname.startsWith('/auth')) return null
 
   return (
     <nav aria-label='Main navigation' className='border-b border-slate-200 bg-white px-6 py-4'>

@@ -5,7 +5,7 @@ import { supabase } from '../../lib/supabase'
 import { defaultDestinationForRole, safeReturnTo } from '../../lib/navigation'
 
 export default function AuthPage() {
-  const [mode, setMode] = useState<'login' | 'register'>('login')
+  const [mode, setMode] = useState<'login' | 'register' | 'forgot'>('login')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [name, setName] = useState('')
@@ -17,15 +17,15 @@ export default function AuthPage() {
     if (isLoading) return
     const next = new URLSearchParams(window.location.search).get('next')
     const destination = next ? safeReturnTo(next) : '/dashboard'
-    if (!email.trim() || !password.trim()) {
-      setMessage({ text: 'Please enter your email and password', type: 'error' })
+    if (!email.trim() || (mode !== 'forgot' && !password.trim())) {
+      setMessage({ text: mode === 'forgot' ? 'Please enter your email address' : 'Please enter your email and password', type: 'error' })
       return
     }
     if (mode === 'register' && !name.trim()) {
       setMessage({ text: 'Please enter your name', type: 'error' })
       return
     }
-    if (password.length < 6) {
+    if (mode !== 'forgot' && password.length < 6) {
       setMessage({ text: 'Password must be at least 6 characters', type: 'error' })
       return
     }
@@ -34,13 +34,24 @@ export default function AuthPage() {
     setMessage(null)
 
     try {
-      if (mode === 'register') {
+      if (mode === 'forgot') {
+        const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), {
+          redirectTo: `${window.location.origin}/auth/reset-password`,
+        })
+        if (error) throw error
+        setMessage({ text: 'If an account exists for this email, a password-reset link is on its way. Please check your inbox and spam folder.', type: 'success' })
+      } else if (mode === 'register') {
         const { data, error } = await supabase.auth.signUp({
-          email,
+          email: email.trim(),
           password,
           options: { data: { full_name: name, account_type: accountType } }
         })
         if (error) throw error
+        if (data.user && data.user.identities?.length === 0) {
+          setMessage({ text: 'An account already exists for this email. Sign in or use Forgot password.', type: 'error' })
+          setMode('login')
+          return
+        }
         if (data.session) {
           window.location.replace(defaultDestinationForRole(undefined, accountType))
           return
@@ -48,13 +59,20 @@ export default function AuthPage() {
         setMessage({ text: 'Account created! Please check your email to confirm your account, then log in.', type: 'success' })
         setMode('login')
       } else {
-        const { data, error } = await supabase.auth.signInWithPassword({ email, password })
+        const { data, error } = await supabase.auth.signInWithPassword({ email: email.trim(), password })
         if (error) throw error
         setMessage({ text: 'Login successful! Redirecting...', type: 'success' })
         window.location.replace(next ? destination : defaultDestinationForRole(data.user?.app_metadata?.role, data.user?.user_metadata?.account_type))
       }
     } catch (err: any) {
-      setMessage({ text: err.message || 'Something went wrong', type: 'error' })
+      const errorText = String(err?.message || '')
+      const rateLimited = /rate limit|too many requests/i.test(errorText)
+      setMessage({
+        text: rateLimited
+          ? 'TalentSeek’s email service is temporarily at its sending limit. Please wait up to one hour before requesting another email.'
+          : errorText || 'Something went wrong',
+        type: 'error',
+      })
     } finally {
       setIsLoading(false)
     }
@@ -78,20 +96,28 @@ export default function AuthPage() {
           </div>
 
           {/* Tabs */}
-          <div className='mb-6 flex rounded-xl border border-slate-200 p-1'>
-            <button onClick={() => { setMode('login'); setMessage(null) }}
-              className={`flex-1 rounded-lg py-2 text-sm font-medium transition-colors ${
-                mode === 'login' ? 'bg-slate-900 text-white' : 'text-slate-600 hover:text-slate-900'
-              }`}>
-              Sign In
-            </button>
-            <button onClick={() => { setMode('register'); setMessage(null) }}
-              className={`flex-1 rounded-lg py-2 text-sm font-medium transition-colors ${
-                mode === 'register' ? 'bg-slate-900 text-white' : 'text-slate-600 hover:text-slate-900'
-              }`}>
-              Create Account
-            </button>
-          </div>
+          {mode === 'forgot' ? (
+            <div className='mb-6'>
+              <button onClick={() => { setMode('login'); setMessage(null) }} className='text-sm font-medium text-slate-600 hover:text-slate-900'>← Back to sign in</button>
+              <h2 className='mt-4 text-xl font-bold text-slate-900'>Reset your password</h2>
+              <p className='mt-2 text-sm leading-6 text-slate-500'>Enter your account email and we’ll send you a secure reset link.</p>
+            </div>
+          ) : (
+            <div className='mb-6 flex rounded-xl border border-slate-200 p-1'>
+              <button onClick={() => { setMode('login'); setMessage(null) }}
+                className={`flex-1 rounded-lg py-2 text-sm font-medium transition-colors ${
+                  mode === 'login' ? 'bg-slate-900 text-white' : 'text-slate-600 hover:text-slate-900'
+                }`}>
+                Sign In
+              </button>
+              <button onClick={() => { setMode('register'); setMessage(null) }}
+                className={`flex-1 rounded-lg py-2 text-sm font-medium transition-colors ${
+                  mode === 'register' ? 'bg-slate-900 text-white' : 'text-slate-600 hover:text-slate-900'
+                }`}>
+                Create Account
+              </button>
+            </div>
+          )}
 
           {/* Form */}
           <div className='space-y-4'>
@@ -127,13 +153,13 @@ export default function AuthPage() {
                 onKeyDown={e => e.key === 'Enter' && handleSubmit()}
                 className='w-full rounded-xl border border-slate-200 bg-white p-3 text-sm text-slate-900 placeholder:text-slate-400 outline-none focus:border-slate-500' />
             </div>
-            <div>
+            {mode !== 'forgot' && <div>
               <label className='mb-1 block text-sm font-medium text-slate-700'>Password</label>
               <input type='password' value={password} onChange={e => setPassword(e.target.value)}
                 placeholder='Minimum 6 characters'
                 onKeyDown={e => e.key === 'Enter' && handleSubmit()}
                 className='w-full rounded-xl border border-slate-200 bg-white p-3 text-sm text-slate-900 placeholder:text-slate-400 outline-none focus:border-slate-500' />
-            </div>
+            </div>}
           </div>
 
           {message && (
@@ -146,8 +172,12 @@ export default function AuthPage() {
 
           <button onClick={handleSubmit} disabled={isLoading}
             className='mt-6 w-full rounded-xl bg-slate-900 py-3 text-sm font-semibold text-white hover:bg-slate-800 disabled:opacity-50'>
-            {isLoading ? 'Please wait...' : mode === 'login' ? 'Sign In' : accountType === 'employer' ? 'Create Employer Account' : 'Create Candidate Account'}
+            {isLoading ? 'Please wait...' : mode === 'forgot' ? 'Send Reset Link' : mode === 'login' ? 'Sign In' : accountType === 'employer' ? 'Create Employer Account' : 'Create Candidate Account'}
           </button>
+
+          {mode === 'login' && (
+            <button onClick={() => { setMode('forgot'); setMessage(null) }} className='mt-4 w-full text-center text-sm font-medium text-teal-700 hover:text-teal-900'>Forgot password?</button>
+          )}
 
           {mode === 'register' && (
             <p className='mt-4 text-center text-xs text-slate-400'>
