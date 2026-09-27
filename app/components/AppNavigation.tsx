@@ -59,6 +59,7 @@ export function AppNavigation() {
               { href: '/dashboard', label: 'Home' },
               { href: '/', label: 'Resume Optimizer' },
               { href: '/master-resume', label: 'Master Resume Builder' },
+              { href: '/billing', label: 'Plan & Usage' },
             ]
         ).map(({ href, label }) => (
           <Link key={href} href={href} aria-current={pathname === href ? 'page' : undefined}
