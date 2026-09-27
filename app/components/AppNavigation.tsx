@@ -51,6 +51,7 @@ export function AppNavigation() {
             ]
           : role === 'employer'
           ? [
+              { href: '/employer/jobs', label: 'Employer Home' },
               { href: '/employer/jobs/new', label: 'Post a Job' },
               { href: '/jobs', label: 'View Job Board' },
             ]

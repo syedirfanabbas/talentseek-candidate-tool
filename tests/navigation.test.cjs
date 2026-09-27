@@ -69,7 +69,7 @@ test('general sign-in opens the appropriate workspace while explicit links stay 
   assert.equal((await request('/auth', user)).headers.get('location'), 'https://app.talentseek.ca/dashboard')
   assert.equal(defaultDestinationForRole('recruiter'), '/recruiter/dashboard')
   assert.equal(defaultDestinationForRole('admin'), '/admin/dashboard')
-  assert.equal(defaultDestinationForRole(undefined, 'employer'), '/employer/jobs/new')
+  assert.equal(defaultDestinationForRole(undefined, 'employer'), '/employer/jobs')
   assert.equal((await request('/auth', { app_metadata: { role: 'recruiter' } })).headers.get('location'), 'https://app.talentseek.ca/recruiter/dashboard')
   assert.equal((await request('/auth', { app_metadata: { role: 'admin' } })).headers.get('location'), 'https://app.talentseek.ca/admin/dashboard')
   assert.equal((await request('/auth?next=%2F', user)).headers.get('location'), 'https://app.talentseek.ca/')
