@@ -19,8 +19,8 @@ const offers = [
 ]
 
 const recruiterOffers = [
-  { key: 'written_review', name: 'Written Recruiter Review', price: 'C$49', detail: 'Personalized written feedback and prioritized resume recommendations.' },
-  { key: 'recruiter_session', name: 'Recruiter Strategy Session', price: 'C$100', detail: 'A 30-minute session for resume, career, or interview guidance.' },
+  { key: 'written_review', name: 'Written Recruiter Review', price: 'C$49', detail: 'Personalized written feedback and prioritized resume recommendations. You will be asked for your target role at checkout.' },
+  { key: 'recruiter_session', name: 'Recruiter Strategy Session', price: 'C$100', detail: 'A 30-minute session for resume, career, or interview guidance. We email you to schedule it after payment.' },
 ]
 
 export default function BillingPage() {
@@ -32,7 +32,7 @@ export default function BillingPage() {
 
   useEffect(() => {
     const checkoutResult = new URLSearchParams(window.location.search).get('checkout')
-    if (checkoutResult === 'success') setNotice('Payment received. Your plan and credits will update in a moment.')
+    if (checkoutResult === 'success') setNotice('Payment received. Your plan and credits will update in a moment. If you booked recruiter support, your request is now with our recruiters and we will email you about next steps.')
     if (checkoutResult === 'cancelled') setNotice('Checkout was cancelled. No charge was made.')
     void (async () => {
       const { data } = await supabase.auth.getSession()
