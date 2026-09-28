@@ -76,6 +76,12 @@ function buildDocxParagraphs(resumeText: string): Paragraph[] {
   })
 }
 
+// Shows the backend's explanation (e.g. a usage limit and when to retry) when it gives one.
+async function errorMessage(res: Response, fallback: string): Promise<string> {
+  const body = await res.json().catch(() => null)
+  return typeof body?.detail === 'string' ? body.detail : fallback
+}
+
 export default function MasterResume() {
   const [files, setFiles] = useState<{ name: string; text: string }[]>([])
   const [masterResume, setMasterResume] = useState('')
@@ -131,7 +137,7 @@ export default function MasterResume() {
           headers: authHeaders,
           body: formData,
         })
-        if (!res.ok) throw new Error('Failed to parse ' + file.name)
+        if (!res.ok) throw new Error(await errorMessage(res, 'Failed to parse ' + file.name))
         const data = await res.json()
         if (data.text) {
           setFiles(prev => [...prev, { name: file.name, text: data.text }])
@@ -160,7 +166,7 @@ export default function MasterResume() {
         headers: { 'Content-Type': 'application/json', ...authHeaders },
         body: JSON.stringify({ resumes: files.map(f => f.text) }),
       })
-      if (!res.ok) throw new Error('Consolidation failed')
+      if (!res.ok) throw new Error(await errorMessage(res, 'Consolidation failed'))
       const data = await res.json()
       setMasterResume(data.master_resume || '')
     } catch (err) {
