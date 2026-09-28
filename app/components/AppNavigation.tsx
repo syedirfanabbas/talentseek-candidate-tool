@@ -13,8 +13,7 @@ export function AppNavigation() {
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data }) => {
-      const protectedRole = data.user?.app_metadata?.role
-      setRole(protectedRole || (data.user?.user_metadata?.account_type === 'employer' ? 'employer' : 'candidate'))
+      setRole(data.user?.app_metadata?.role || 'candidate')
     })
   }, [])
 

@@ -53,17 +53,15 @@ export async function middleware(req: NextRequest) {
 
   if (user && isAuthPage) {
     const next = req.nextUrl.searchParams.get('next')
-    return redirectTo(next ? safeReturnTo(next) : defaultDestinationForRole(user.app_metadata?.role, user.user_metadata?.account_type))
+    return redirectTo(next ? safeReturnTo(next) : defaultDestinationForRole(user.app_metadata?.role))
   }
 
   if (user) {
+    // Only app_metadata is trusted: users can edit their own user_metadata.
+    // Employer accounts receive app_metadata.role = 'employer' at sign-up (backend migration 015).
     const role = user.app_metadata?.role
-    const accountType = user.user_metadata?.account_type
 
-    if (
-      pathname === '/dashboard' &&
-      (role === 'employer' || accountType === 'employer')
-    ) {
+    if (pathname === '/dashboard' && role === 'employer') {
       return redirectTo('/employer/jobs/new')
     }
 
@@ -82,8 +80,7 @@ export async function middleware(req: NextRequest) {
     if (
       pathname.startsWith('/employer') &&
       role !== 'admin' &&
-      role !== 'employer' &&
-      accountType !== 'employer'
+      role !== 'employer'
     ) {
       return redirectTo('/dashboard')
     }
