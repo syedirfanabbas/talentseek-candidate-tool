@@ -112,9 +112,47 @@ test('role restrictions remain enforced after returning from login', async () =>
 
 test('only employer accounts and admins can open employer tools', async () => {
   assert.equal((await request('/employer/jobs/new', { app_metadata: {}, user_metadata: { account_type: 'candidate' } })).status, 307)
-  assert.equal((await request('/employer/jobs/new', { app_metadata: {}, user_metadata: { account_type: 'employer' } })).status, 200)
+  assert.equal((await request('/employer/jobs/new', { app_metadata: { role: 'employer' }, user_metadata: { account_type: 'employer' } })).status, 200)
   assert.equal((await request('/employer/jobs/new', { app_metadata: { role: 'admin' }, user_metadata: {} })).status, 200)
-  assert.equal((await request('/dashboard', { app_metadata: {}, user_metadata: { account_type: 'employer' } })).headers.get('location'), 'https://app.talentseek.ca/employer/jobs/new')
+  assert.equal((await request('/dashboard', { app_metadata: { role: 'employer' }, user_metadata: { account_type: 'employer' } })).headers.get('location'), 'https://app.talentseek.ca/employer/jobs/new')
+})
+
+test('user-editable metadata never grants a role', async () => {
+  // Any signed-in user can call supabase.auth.updateUser({ data: { ... } }).
+  for (const user_metadata of [{ account_type: 'employer' }, { role: 'admin' }, { role: 'recruiter' }, { role: 'employer' }]) {
+    for (const route of ['/employer/jobs', '/employer/jobs/new', '/admin/dashboard', '/admin/prompts', '/recruiter/requests']) {
+      const response = await request(route, { app_metadata: {}, user_metadata })
+      assert.equal(response.status, 307, `${JSON.stringify(user_metadata)}: ${route}`)
+      assert.equal(response.headers.get('location'), 'https://app.talentseek.ca/dashboard')
+    }
+  }
+})
+
+test('every protected area follows the role matrix', async () => {
+  const areas = {
+    '/dashboard': ['candidate', 'recruiter', 'admin'],
+    '/billing': ['candidate', 'employer', 'recruiter', 'admin'],
+    '/master-resume': ['candidate', 'employer', 'recruiter', 'admin'],
+    '/my-resumes': ['candidate', 'employer', 'recruiter', 'admin'],
+    '/interview-prep': ['candidate', 'employer', 'recruiter', 'admin'],
+    '/employer/jobs': ['employer', 'admin'],
+    '/employer/jobs/new': ['employer', 'admin'],
+    '/recruiter': ['recruiter', 'admin'],
+    '/recruiter/dashboard': ['recruiter', 'admin'],
+    '/recruiter/requests': ['recruiter', 'admin'],
+    '/admin': ['admin'],
+    '/admin/dashboard': ['admin'],
+    '/admin/prompts': ['admin'],
+    '/admin/jobs': ['admin'],
+  }
+  for (const [route, allowed] of Object.entries(areas)) {
+    assert.equal((await request(route)).status, 307, `anonymous: ${route}`)
+    for (const role of ['candidate', 'employer', 'recruiter', 'admin']) {
+      const user = { app_metadata: role === 'candidate' ? {} : { role }, user_metadata: {} }
+      const response = await request(route, user)
+      assert.equal(response.status, allowed.includes(role) ? 200 : 307, `${role}: ${route}`)
+    }
+  }
 })
 
 test('refreshed session cookies are preserved on every redirect branch', async () => {
