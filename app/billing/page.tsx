@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { supabase } from '../../lib/supabase'
+import { PRIVACY_URL, TERMS_URL } from '../../lib/legal'
 
 type BillingSummary = {
   entitlement: { plan_key: string; subscription_status: string; subscription_period_end?: string | null }
@@ -98,6 +99,8 @@ export default function BillingPage() {
             {recruiterOffers.map(offer => <article key={offer.key} className='rounded-2xl bg-white/10 p-5'><h3 className='text-lg font-bold'>{offer.name}</h3><p className='mt-2 text-2xl font-bold'>{offer.price}</p><p className='mt-2 min-h-14 text-sm leading-6 text-slate-300'>{offer.detail}</p><button onClick={() => void startCheckout(offer.key)} disabled={!summary?.checkout_enabled || checkingOut !== null} className='mt-4 w-full rounded-xl bg-white px-4 py-3 font-semibold text-slate-900 disabled:cursor-not-allowed disabled:opacity-55'>{checkingOut === offer.key ? 'Opening secure checkout…' : summary?.checkout_enabled ? 'Book and pay' : 'Checkout setup in progress'}</button></article>)}
           </div>
         </section>
+
+        <p className='mt-6 text-sm leading-6 text-slate-500'>All prices are in Canadian dollars and are charged securely through Stripe. Purchases are covered by the refund and cancellation terms in our <a href={TERMS_URL} target='_blank' rel='noopener noreferrer' className='underline hover:text-slate-700'>Terms of Service</a> (sections 6.5 and 7). See our <a href={PRIVACY_URL} target='_blank' rel='noopener noreferrer' className='underline hover:text-slate-700'>Privacy Policy</a> for how we handle your information.</p>
 
         {summary?.orders.length ? <section className='mt-12'><h2 className='text-2xl font-bold text-slate-900'>Purchase history</h2><div className='mt-4 overflow-hidden rounded-2xl border border-slate-200 bg-white'>{summary.orders.map(order => <div key={order.id} className='flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 px-5 py-4 last:border-0'><div><p className='font-semibold text-slate-900'>{order.product_key.replaceAll('_', ' ')}</p><p className='text-sm text-slate-500'>{new Date(order.created_at).toLocaleDateString()}</p></div><p className='text-sm font-semibold uppercase text-slate-600'>{order.status}</p></div>)}</div></section> : null}
       </div>

@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { supabase } from '../../lib/supabase'
 import { defaultDestinationForRole, safeReturnTo } from '../../lib/navigation'
+import { MARKETING_CONSENT_TEXT, MARKETING_CONSENT_VERSION, PRIVACY_URL, TERMS_URL } from '../../lib/legal'
 
 export default function AuthPage() {
   const [mode, setMode] = useState<'login' | 'register' | 'forgot'>('login')
@@ -10,6 +11,7 @@ export default function AuthPage() {
   const [password, setPassword] = useState('')
   const [name, setName] = useState('')
   const [accountType, setAccountType] = useState<'candidate' | 'employer'>('candidate')
+  const [marketingOptIn, setMarketingOptIn] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
   const [message, setMessage] = useState<{ text: string; type: 'success' | 'error' } | null>(null)
 
@@ -44,7 +46,15 @@ export default function AuthPage() {
         const { data, error } = await supabase.auth.signUp({
           email: email.trim(),
           password,
-          options: { data: { full_name: name, account_type: accountType } }
+          options: {
+            data: {
+              full_name: name,
+              account_type: accountType,
+              // Recorded in Supabase's append-only consent ledger at sign-up (migration 014).
+              marketing_opt_in: marketingOptIn,
+              marketing_consent_version: MARKETING_CONSENT_VERSION,
+            },
+          },
         })
         if (error) throw error
         if (data.user && data.user.identities?.length === 0) {
@@ -160,6 +170,13 @@ export default function AuthPage() {
                 onKeyDown={e => e.key === 'Enter' && handleSubmit()}
                 className='w-full rounded-xl border border-slate-200 bg-white p-3 text-sm text-slate-900 placeholder:text-slate-400 outline-none focus:border-slate-500' />
             </div>}
+            {mode === 'register' && (
+              <label className='flex items-start gap-3 text-sm leading-6 text-slate-600'>
+                <input type='checkbox' checked={marketingOptIn} onChange={e => setMarketingOptIn(e.target.checked)}
+                  className='mt-1 h-4 w-4 shrink-0 rounded border-slate-300 text-teal-700' />
+                <span>{MARKETING_CONSENT_TEXT} <span className='text-slate-400'>(Optional)</span></span>
+              </label>
+            )}
           </div>
 
           {message && (
@@ -180,8 +197,8 @@ export default function AuthPage() {
           )}
 
           {mode === 'register' && (
-            <p className='mt-4 text-center text-xs text-slate-400'>
-              By creating an account you agree to our terms of service. This is a free beta — no credit card required.
+            <p className='mt-4 text-center text-xs leading-5 text-slate-500'>
+              By creating an account you agree to the <a href={TERMS_URL} target='_blank' rel='noopener noreferrer' className='underline hover:text-slate-700'>Terms of Service</a> and acknowledge the <a href={PRIVACY_URL} target='_blank' rel='noopener noreferrer' className='underline hover:text-slate-700'>Privacy Policy</a>. Start free — no credit card required.
             </p>
           )}
         </div>
