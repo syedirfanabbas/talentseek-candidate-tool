@@ -2,6 +2,7 @@
 
 import { FormEvent, useState } from 'react'
 import { supabase } from '../../lib/supabase'
+import { errorDetail, outOfCreditsMessage } from '../../lib/credits'
 
 type PreparationPack = {
   match_confidence: { score: number; label: string; summary: string }
@@ -25,11 +26,13 @@ export default function InterviewPreparationPage() {
   const [checked, setChecked] = useState<string[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+  const [needsCredits, setNeedsCredits] = useState(false)
 
   async function generatePack(event: FormEvent) {
     event.preventDefault()
     setLoading(true)
     setError('')
+    setNeedsCredits(false)
     const { data } = await supabase.auth.getSession()
     const headers: Record<string, string> = { 'Content-Type': 'application/json' }
     if (data.session) headers.Authorization = `Bearer ${data.session.access_token}`
@@ -39,8 +42,12 @@ export default function InterviewPreparationPage() {
         headers,
         body: JSON.stringify({ job_title: jobTitle.trim(), company_name: companyName.trim(), interview_type: interviewType, job_description: jobDescription.trim(), resume_text: resumeText.trim() || undefined }),
       })
-      const result = await response.json()
-      if (!response.ok) throw new Error(result.detail || 'Unable to generate your interview preparation pack.')
+      const result = await response.json().catch(() => null)
+      if (!response.ok) {
+        const creditMessage = outOfCreditsMessage(response.status, result)
+        if (creditMessage) { setNeedsCredits(true); throw new Error(creditMessage) }
+        throw new Error(errorDetail(result, 'Unable to generate your interview preparation pack.'))
+      }
       setPack(result)
       setChecked([])
     } catch (generationError) {
@@ -61,7 +68,7 @@ export default function InterviewPreparationPage() {
       <label className='mt-4 block text-sm font-medium text-slate-700'>Job description<textarea required minLength={40} value={jobDescription} onChange={event => setJobDescription(event.target.value)} className='mt-1.5 min-h-40 w-full rounded-xl border border-slate-300 px-3 py-2 text-sm text-slate-900' placeholder='Paste the job description here.' /></label>
       <label className='mt-4 block text-sm font-medium text-slate-700'>Resume text <span className='font-normal text-slate-500'>(optional, for personalized guidance)</span><textarea value={resumeText} onChange={event => setResumeText(event.target.value)} className='mt-1.5 min-h-40 w-full rounded-xl border border-slate-300 px-3 py-2 text-sm text-slate-900' placeholder='Paste your resume here.' /></label>
       {!pack && <button disabled={loading} className='mt-6 rounded-xl bg-slate-900 px-5 py-3 text-sm font-semibold text-white hover:bg-slate-700 disabled:opacity-50'>{loading ? 'Creating your preparation pack…' : 'Generate interview plan →'}</button>}
-      {error && <p role='alert' className='mt-4 text-sm text-red-700'>{error}</p>}
+      {error && <p role='alert' className='mt-4 text-sm text-red-700'>{error}{needsCredits && <a href='/billing' className='ml-2 font-semibold underline'>View plans →</a>}</p>}
     </form>
 
     {pack && <section className='mt-8 space-y-6'><div className='grid gap-6 md:grid-cols-[220px_1fr]'><article className='rounded-2xl bg-slate-900 p-6 text-white'><p className='text-xs font-semibold uppercase tracking-wider text-teal-300'>Resume match</p><p className='mt-3 text-5xl font-bold'>{pack.match_confidence.score}%</p><p className='mt-2 font-semibold'>{pack.match_confidence.label}</p><p className='mt-3 text-sm leading-6 text-slate-300'>{pack.match_confidence.summary}</p></article><article className='rounded-2xl border border-slate-200 bg-white p-6 shadow-sm'><h2 className='text-xl font-bold text-slate-900'>What this role needs</h2><p className='mt-3 leading-7 text-slate-600'>{pack.role_summary}</p><h3 className='mt-5 text-sm font-semibold uppercase tracking-wider text-teal-700'>Skills to demonstrate</h3><div className='mt-3 flex flex-wrap gap-2'>{pack.skills_to_demonstrate.map(skill => <span key={skill} className='rounded-full bg-teal-50 px-3 py-1 text-sm text-teal-800'>{skill}</span>)}</div></article></div>

@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
+import { errorDetail, outOfCreditsMessage } from '../lib/credits'
 import { LoadingSpinner } from './components/LoadingSpinner'
 import {
   Document, Packer, Paragraph, TextRun, BorderStyle,
@@ -172,6 +173,7 @@ export default function CandidateTool() {
   const [isLoading, setIsLoading] = useState(false)
   const [isAnalyzing, setIsAnalyzing] = useState(false)
   const [error, setError] = useState('')
+  const [needsCredits, setNeedsCredits] = useState(false)
   const [uploadingResume, setUploadingResume] = useState(false)
   const [uploadingJD, setUploadingJD] = useState(false)
   const [resumeLength, setResumeLength] = useState('2')
@@ -226,7 +228,7 @@ export default function CandidateTool() {
 
   const handleOptimize = async () => {
     if (!resume.trim() || !jobDescription.trim()) { setError('Please fill in both fields'); return }
-    setIsLoading(true); setError(''); setOptimizedResume(''); setProfileImprovements(''); setAnalysis(null)
+    setIsLoading(true); setError(''); setNeedsCredits(false); setOptimizedResume(''); setProfileImprovements(''); setAnalysis(null)
     try {
       const authHeaders = await getAuthHeaders()
       const res = await fetch(`${API_URL}/resumes/optimize-demo`, {
@@ -238,7 +240,12 @@ export default function CandidateTool() {
           length_pages: Number(resumeLength),
         }),
       })
-      if (!res.ok) throw new Error('Optimization failed')
+      if (!res.ok) {
+        const body = await res.json().catch(() => null)
+        const creditMessage = outOfCreditsMessage(res.status, body)
+        if (creditMessage) { setNeedsCredits(true); throw new Error(creditMessage) }
+        throw new Error(errorDetail(body, 'Optimization failed'))
+      }
       const data = await res.json()
       setOptimizedResume(data.optimized_content || '')
       setProfileImprovements(data.profile_improvements || '')
@@ -467,7 +474,7 @@ export default function CandidateTool() {
                 {isLoading ? 'Working...' : '✨ Optimize Resume'}
               </button>
             </div>
-            {error && <div className='mt-4 rounded-xl bg-red-50 p-4 text-sm text-red-700'>{error}</div>}
+            {error && <div className='mt-4 rounded-xl bg-red-50 p-4 text-sm text-red-700'>{error}{needsCredits && <a href='/billing' className='ml-2 font-semibold underline'>View plans →</a>}</div>}
           </section>
 
           <section className='rounded-2xl bg-white p-6 shadow-sm'>
