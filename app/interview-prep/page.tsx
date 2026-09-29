@@ -4,6 +4,7 @@ import { FormEvent, useState } from 'react'
 import { supabase } from '../../lib/supabase'
 import { AiProcessingNotice } from '../components/AiProcessingNotice'
 import { errorDetail, outOfCreditsMessage } from '../../lib/credits'
+import { runAiJob } from '../../lib/aiJobs'
 
 type PreparationPack = {
   match_confidence: { score: number; label: string; summary: string }
@@ -38,18 +39,16 @@ export default function InterviewPreparationPage() {
     const headers: Record<string, string> = { 'Content-Type': 'application/json' }
     if (data.session) headers.Authorization = `Bearer ${data.session.access_token}`
     try {
-      const response = await fetch(`${API_URL}/interview/generate-pack`, {
-        method: 'POST',
-        headers,
-        body: JSON.stringify({ job_title: jobTitle.trim(), company_name: companyName.trim(), interview_type: interviewType, job_description: jobDescription.trim(), resume_text: resumeText.trim() || undefined }),
-      })
-      const result = await response.json().catch(() => null)
-      if (!response.ok) {
-        const creditMessage = outOfCreditsMessage(response.status, result)
+      // Runs as a background job: interview packs can take over a minute, longer than phones wait.
+      const outcome = await runAiJob<PreparationPack>(API_URL, '/interview/generate-pack/jobs',
+        { job_title: jobTitle.trim(), company_name: companyName.trim(), interview_type: interviewType, job_description: jobDescription.trim(), resume_text: resumeText.trim() || undefined },
+        headers)
+      if (!outcome.ok) {
+        const creditMessage = outOfCreditsMessage(outcome.status, outcome.body)
         if (creditMessage) { setNeedsCredits(true); throw new Error(creditMessage) }
-        throw new Error(errorDetail(result, 'Unable to generate your interview preparation pack.'))
+        throw new Error(errorDetail(outcome.body, 'Unable to generate your interview preparation pack.'))
       }
-      setPack(result)
+      setPack(outcome.result)
       setChecked([])
     } catch (generationError) {
       setError(generationError instanceof Error ? generationError.message : 'Unable to generate your interview preparation pack.')

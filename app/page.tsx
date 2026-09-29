@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
 import { errorDetail, outOfCreditsMessage } from '../lib/credits'
+import { runAiJob } from '../lib/aiJobs'
 import { LoadingSpinner } from './components/LoadingSpinner'
 import { AiProcessingNotice } from './components/AiProcessingNotice'
 import {
@@ -232,22 +233,17 @@ export default function CandidateTool() {
     setIsLoading(true); setError(''); setNeedsCredits(false); setOptimizedResume(''); setProfileImprovements(''); setAnalysis(null)
     try {
       const authHeaders = await getAuthHeaders()
-      const res = await fetch(`${API_URL}/resumes/optimize-demo`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', ...authHeaders },
-        body: JSON.stringify({
-          content: resume,
-          job_description: jobDescription,
-          length_pages: Number(resumeLength),
-        }),
-      })
-      if (!res.ok) {
-        const body = await res.json().catch(() => null)
-        const creditMessage = outOfCreditsMessage(res.status, body)
+      const outcome = await runAiJob<{ optimized_content?: string; profile_improvements?: string }>(
+        API_URL, '/resumes/optimize-demo/jobs',
+        { content: resume, job_description: jobDescription, length_pages: Number(resumeLength) },
+        authHeaders,
+      )
+      if (!outcome.ok) {
+        const creditMessage = outOfCreditsMessage(outcome.status, outcome.body)
         if (creditMessage) { setNeedsCredits(true); throw new Error(creditMessage) }
-        throw new Error(errorDetail(body, 'Optimization failed'))
+        throw new Error(errorDetail(outcome.body, 'Optimization failed'))
       }
-      const data = await res.json()
+      const data = outcome.result
       setOptimizedResume(data.optimized_content || '')
       setProfileImprovements(data.profile_improvements || '')
 
