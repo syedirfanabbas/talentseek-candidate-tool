@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { supabase } from '../../lib/supabase'
 import { defaultDestinationForRole, safeReturnTo } from '../../lib/navigation'
+import { isEmailNotConfirmed } from '../../lib/authErrors'
 import { MARKETING_CONSENT_TEXT, MARKETING_CONSENT_VERSION, PRIVACY_URL, TERMS_URL } from '../../lib/legal'
 
 export default function AuthPage() {
@@ -12,8 +13,24 @@ export default function AuthPage() {
   const [name, setName] = useState('')
   const [accountType, setAccountType] = useState<'candidate' | 'employer'>('candidate')
   const [marketingOptIn, setMarketingOptIn] = useState(false)
+  // Set when the account exists but its email is not confirmed yet, so the user can request a new link.
+  const [unconfirmedEmail, setUnconfirmedEmail] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(false)
   const [message, setMessage] = useState<{ text: string; type: 'success' | 'error' } | null>(null)
+
+  const resendConfirmation = async () => {
+    if (!unconfirmedEmail) return
+    setIsLoading(true)
+    const { error } = await supabase.auth.resend({
+      type: 'signup',
+      email: unconfirmedEmail,
+      options: { emailRedirectTo: `${window.location.origin}/auth` },
+    })
+    setIsLoading(false)
+    setMessage(error
+      ? { text: /rate limit|too many requests|seconds/i.test(error.message) ? 'Please wait a minute before requesting another confirmation email.' : error.message, type: 'error' }
+      : { text: `A new confirmation link was sent to ${unconfirmedEmail}. It is valid for 24 hours.`, type: 'success' })
+  }
 
   const handleSubmit = async () => {
     if (isLoading) return
@@ -47,6 +64,7 @@ export default function AuthPage() {
           email: email.trim(),
           password,
           options: {
+            emailRedirectTo: `${window.location.origin}/auth`,
             data: {
               full_name: name,
               account_type: accountType,
@@ -67,6 +85,7 @@ export default function AuthPage() {
           return
         }
         setMessage({ text: 'Account created! Please check your email to confirm your account, then log in.', type: 'success' })
+        setUnconfirmedEmail(email.trim())
         setMode('login')
       } else {
         const { data, error } = await supabase.auth.signInWithPassword({ email: email.trim(), password })
@@ -75,6 +94,11 @@ export default function AuthPage() {
         window.location.replace(next ? destination : defaultDestinationForRole(data.user?.app_metadata?.role, data.user?.user_metadata?.account_type))
       }
     } catch (err: any) {
+      if (mode === 'login' && isEmailNotConfirmed(err)) {
+        setUnconfirmedEmail(email.trim())
+        setMessage({ text: 'Please confirm your email before signing in. Check your inbox and spam folder, or send a new confirmation link below.', type: 'error' })
+        return
+      }
       const errorText = String(err?.message || '')
       const rateLimited = /rate limit|too many requests/i.test(errorText)
       setMessage({
@@ -185,6 +209,13 @@ export default function AuthPage() {
             }`}>
               {message.text}
             </div>
+          )}
+
+          {mode === 'login' && unconfirmedEmail && (
+            <button onClick={() => void resendConfirmation()} disabled={isLoading}
+              className='mt-3 w-full rounded-xl border border-slate-300 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50'>
+              Resend confirmation email
+            </button>
           )}
 
           <button onClick={handleSubmit} disabled={isLoading}

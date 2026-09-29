@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
 import { errorDetail, outOfCreditsMessage } from '../lib/credits'
 import { LoadingSpinner } from './components/LoadingSpinner'
+import { AiProcessingNotice } from './components/AiProcessingNotice'
 import {
   Document, Packer, Paragraph, TextRun, BorderStyle,
   AlignmentType, UnderlineType
@@ -442,6 +443,7 @@ export default function CandidateTool() {
             <textarea value={resume} onChange={(e) => setResume(e.target.value)}
               placeholder='Or paste your resume here...'
               className='min-h-[160px] w-full rounded-xl border border-slate-300 p-4 text-sm text-slate-900 outline-none focus:border-slate-500' />
+            <AiProcessingNotice />
 
             <h2 className='mb-3 mt-5 text-xl font-semibold text-slate-900'>Job Description</h2>
             <label className='mb-3 flex cursor-pointer items-center gap-2 rounded-xl border border-dashed border-slate-300 px-4 py-3 text-sm text-slate-600 hover:border-slate-400'>

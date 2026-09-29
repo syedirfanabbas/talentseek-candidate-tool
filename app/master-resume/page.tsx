@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { LoadingSpinner } from '../components/LoadingSpinner'
+import { AiProcessingNotice } from '../components/AiProcessingNotice'
 import { Document, Packer, Paragraph, TextRun, BorderStyle } from 'docx'
 import { saveAs } from 'file-saver'
 import jsPDF from 'jspdf'
@@ -278,6 +279,7 @@ export default function MasterResume() {
                 />
               </label>
             )}
+            <AiProcessingNotice />
 
             {uploadingIndex !== null && (
               <div className='mb-3 flex items-center gap-2 text-sm text-slate-500'>
