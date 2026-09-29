@@ -2,6 +2,7 @@
 
 import { FormEvent, useState } from 'react'
 import { supabase } from '../../lib/supabase'
+import { AiProcessingNotice } from '../components/AiProcessingNotice'
 import { errorDetail, outOfCreditsMessage } from '../../lib/credits'
 
 type PreparationPack = {
@@ -67,6 +68,7 @@ export default function InterviewPreparationPage() {
       <div className='mt-6 grid gap-4 md:grid-cols-2'><label className='text-sm font-medium text-slate-700'>Job title<input required value={jobTitle} onChange={event => setJobTitle(event.target.value)} className='mt-1.5 w-full rounded-xl border border-slate-300 px-3 py-2 text-slate-900' placeholder='e.g. Senior Project Manager' /></label><label className='text-sm font-medium text-slate-700'>Company<input required value={companyName} onChange={event => setCompanyName(event.target.value)} className='mt-1.5 w-full rounded-xl border border-slate-300 px-3 py-2 text-slate-900' placeholder='Company name' /></label><label className='text-sm font-medium text-slate-700'>Interview type<select value={interviewType} onChange={event => setInterviewType(event.target.value)} className='mt-1.5 w-full rounded-xl border border-slate-300 px-3 py-2 text-slate-900'>{interviewTypes.map(type => <option key={type}>{type}</option>)}</select></label></div>
       <label className='mt-4 block text-sm font-medium text-slate-700'>Job description<textarea required minLength={40} value={jobDescription} onChange={event => setJobDescription(event.target.value)} className='mt-1.5 min-h-40 w-full rounded-xl border border-slate-300 px-3 py-2 text-sm text-slate-900' placeholder='Paste the job description here.' /></label>
       <label className='mt-4 block text-sm font-medium text-slate-700'>Resume text <span className='font-normal text-slate-500'>(optional, for personalized guidance)</span><textarea value={resumeText} onChange={event => setResumeText(event.target.value)} className='mt-1.5 min-h-40 w-full rounded-xl border border-slate-300 px-3 py-2 text-sm text-slate-900' placeholder='Paste your resume here.' /></label>
+      <AiProcessingNotice />
       {!pack && <button disabled={loading} className='mt-6 rounded-xl bg-slate-900 px-5 py-3 text-sm font-semibold text-white hover:bg-slate-700 disabled:opacity-50'>{loading ? 'Creating your preparation pack…' : 'Generate interview plan →'}</button>}
       {error && <p role='alert' className='mt-4 text-sm text-red-700'>{error}{needsCredits && <a href='/billing' className='ml-2 font-semibold underline'>View plans →</a>}</p>}
     </form>
