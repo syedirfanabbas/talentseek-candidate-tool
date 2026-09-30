@@ -21,7 +21,7 @@ const offers = [
 
 const recruiterOffers = [
   { key: 'written_review', name: 'Written Recruiter Review', price: 'C$49', detail: 'Personalized written feedback and prioritized resume recommendations. You will be asked for your target role at checkout.' },
-  { key: 'recruiter_session', name: 'Recruiter Strategy Session', price: 'C$100', detail: 'A 30-minute session for resume, career, or interview guidance. We email you to schedule it after payment.' },
+  { key: 'recruiter_session', name: 'Recruiter Strategy Session', price: 'C$100', detail: 'A 30-minute session for resume, career, or interview guidance. Choose your time right after payment.' },
 ]
 
 export default function BillingPage() {
@@ -100,7 +100,7 @@ export default function BillingPage() {
           </section>
         )}
 
-        <section className='mt-10 rounded-2xl bg-slate-900 p-7 text-white sm:p-9'>
+        <section id='recruiter-support' className='mt-10 scroll-mt-24 rounded-2xl bg-slate-900 p-7 text-white sm:p-9'>
           <p className='text-sm font-semibold uppercase tracking-widest text-teal-300'>Human support</p>
           <h2 className='mt-3 text-2xl font-bold'>Get guidance from a recruiter.</h2>
           <p className='mt-3 max-w-3xl leading-7 text-slate-300'>Choose focused help for your resume, career direction, or next interview.</p>
