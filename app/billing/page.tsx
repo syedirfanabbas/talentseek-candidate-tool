@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '../../lib/supabase'
 import { PRIVACY_URL, TERMS_URL } from '../../lib/legal'
+import { SESSION_BOOKING_PAGES, hasPaidSession } from '../../lib/booking'
 
 type BillingSummary = {
   entitlement: { plan_key: string; subscription_status: string; subscription_period_end?: string | null }
@@ -32,7 +33,7 @@ export default function BillingPage() {
 
   useEffect(() => {
     const checkoutResult = new URLSearchParams(window.location.search).get('checkout')
-    if (checkoutResult === 'success') setNotice('Payment received. Your plan and credits will update in a moment. If you booked recruiter support, your request is now with our recruiters and we will email you about next steps.')
+    if (checkoutResult === 'success') setNotice('Payment received. Your plan and credits will update in a moment. If you booked recruiter support, your request is now with our recruiters. For a strategy session, choose your time below.')
     if (checkoutResult === 'cancelled') setNotice('Checkout was cancelled. No charge was made.')
     void (async () => {
       const { data } = await supabase.auth.getSession()
@@ -90,6 +91,14 @@ export default function BillingPage() {
             {offers.map(offer => <article key={offer.name} className='flex flex-col rounded-2xl border border-slate-200 bg-white p-6 shadow-sm'><h3 className='text-xl font-bold text-slate-900'>{offer.name}</h3><p className='mt-3 text-3xl font-bold text-slate-900'>{offer.price}</p><p className='mt-4 flex-1 leading-7 text-slate-600'>{offer.detail}</p><button onClick={() => void startCheckout(offer.key)} disabled={!summary?.checkout_enabled || checkingOut !== null} className='mt-6 rounded-xl bg-slate-900 px-4 py-3 font-semibold text-white disabled:cursor-not-allowed disabled:opacity-55'>{checkingOut === offer.key ? 'Opening secure checkout…' : summary?.checkout_enabled ? 'Buy with Stripe' : 'Checkout setup in progress'}</button></article>)}
           </div>
         </section>
+
+        {hasPaidSession(summary?.orders) && (
+          <section className='mt-10 rounded-2xl border border-teal-200 bg-teal-50 p-6 sm:p-7' aria-label='Book your recruiter session'>
+            <h2 className='text-xl font-bold text-slate-900'>Book your 30-minute session</h2>
+            <p className='mt-2 max-w-3xl leading-7 text-slate-700'>Choose a time that suits you. Please book with the same email address you used for your purchase, so we can match your booking to your order. A Google Meet link is included in your confirmation.</p>
+            <div className='mt-4 flex flex-wrap gap-3'>{SESSION_BOOKING_PAGES.map(page => <a key={page.url} href={page.url} target='_blank' rel='noopener noreferrer' className='rounded-xl bg-slate-900 px-5 py-3 text-sm font-semibold text-white hover:bg-slate-700'>{page.label}</a>)}</div>
+          </section>
+        )}
 
         <section className='mt-10 rounded-2xl bg-slate-900 p-7 text-white sm:p-9'>
           <p className='text-sm font-semibold uppercase tracking-widest text-teal-300'>Human support</p>
