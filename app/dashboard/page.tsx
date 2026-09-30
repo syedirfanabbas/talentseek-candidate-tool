@@ -5,7 +5,7 @@ import { FormEvent, useEffect, useState } from 'react'
 import { supabase } from '../../lib/supabase'
 
 type Application = { id: string; company_name: string; role_title: string; job_url?: string; status: string; notes?: string }
-type RecruiterRequest = { id: string; target_role: string; notes?: string; status: string }
+type RecruiterRequest = { id: string; target_role: string; notes?: string; status: string; service_type?: string | null }
 
 const choices = [
   {
@@ -24,9 +24,9 @@ const choices = [
   },
   {
     title: 'Get Recruiter Help',
-    description: 'Work with a TalentSeek recruiter to review and strengthen your resume for your next opportunity.',
-    action: 'Contact a recruiter',
-    href: 'https://talentseek.ca/contact/',
+    description: 'Book a written resume review (C$49) or a 30-minute strategy session (C$100) with an experienced recruiter.',
+    action: 'Book recruiter support',
+    href: '/billing#recruiter-support',
     category: 'Work with an expert',
   },
   {
@@ -53,9 +53,6 @@ export default function DashboardPage() {
   const [isLoading, setIsLoading] = useState(true)
   const [isSaving, setIsSaving] = useState(false)
   const [requests, setRequests] = useState<RecruiterRequest[]>([])
-  const [targetRole, setTargetRole] = useState('')
-  const [requestNotes, setRequestNotes] = useState('')
-  const [isRequesting, setIsRequesting] = useState(false)
   const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
 
   async function authHeaders(): Promise<Record<string, string>> {
@@ -71,15 +68,6 @@ export default function DashboardPage() {
 
   useEffect(() => { void loadApplications() }, [])
   useEffect(() => { void (async () => { const response = await fetch(`${API_URL}/recruiter-requests`, { headers: await authHeaders() }); if (response.ok) setRequests(await response.json()) })() }, [])
-
-  async function submitRecruiterRequest(event: FormEvent) {
-    event.preventDefault()
-    if (!targetRole.trim()) return
-    setIsRequesting(true)
-    const response = await fetch(`${API_URL}/recruiter-requests`, { method: 'POST', headers: { 'Content-Type': 'application/json', ...await authHeaders() }, body: JSON.stringify({ target_role: targetRole.trim(), notes: requestNotes.trim() || undefined }) })
-    if (response.ok) { setRequests([await response.json(), ...requests]); setTargetRole(''); setRequestNotes('') }
-    setIsRequesting(false)
-  }
 
   async function addApplication(event: FormEvent) {
     event.preventDefault()
@@ -123,7 +111,6 @@ export default function DashboardPage() {
               <Link href={choice.href} className='mt-8 inline-flex items-center justify-between gap-3 rounded-xl bg-slate-900 px-4 py-3 text-sm font-semibold text-white hover:bg-slate-700 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-teal-700'>
                 {choice.action}<span aria-hidden='true'>→</span>
               </Link>
-              {choice.href.startsWith('https:') && <p className='mt-3 text-xs text-slate-500'>Opens the contact page on TalentSeek.ca.</p>}
             </section>
           ))}
         </div>
@@ -148,14 +135,10 @@ export default function DashboardPage() {
 
         <section className='mt-8 rounded-2xl border border-slate-200 bg-white p-7 shadow-sm'>
           <p className='text-xs font-semibold uppercase tracking-wider text-teal-700'>Work with an expert</p>
-          <h2 className='mt-2 text-2xl font-bold text-slate-900'>Request recruiter help</h2>
-          <p className='mt-2 text-slate-600'>Tell us which role you are targeting and a recruiter will review your resume.</p>
-          <form onSubmit={submitRecruiterRequest} className='mt-6 grid gap-3'>
-            <input value={targetRole} onChange={e => setTargetRole(e.target.value)} placeholder='Target role' aria-label='Target role' className='rounded-xl border border-slate-300 px-3 py-2 text-sm text-slate-900' />
-            <textarea value={requestNotes} onChange={e => setRequestNotes(e.target.value)} placeholder='What would you like help with? (optional)' aria-label='Recruiter request notes' className='min-h-24 rounded-xl border border-slate-300 px-3 py-2 text-sm text-slate-900' />
-            <button disabled={isRequesting} className='w-fit rounded-xl bg-slate-900 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50'>{isRequesting ? 'Submitting…' : 'Request recruiter review'}</button>
-          </form>
-          <div className='mt-6 space-y-3'>{requests.map(request => <div key={request.id} className='rounded-xl border border-slate-200 p-4'><p className='font-semibold text-slate-900'>{request.target_role}</p><p className='text-sm capitalize text-slate-500'>{request.status.replace('_', ' ')}</p></div>)}</div>
+          <h2 className='mt-2 text-2xl font-bold text-slate-900'>Recruiter support</h2>
+          <p className='mt-2 text-slate-600'>Book a written review or a strategy session. You tell us your target role at checkout, and your booking appears here.</p>
+          <Link href='/billing#recruiter-support' className='mt-6 inline-flex items-center gap-3 rounded-xl bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-700'>Book recruiter support<span aria-hidden='true'>→</span></Link>
+          {requests.length > 0 && <div className='mt-6 space-y-3'>{requests.map(request => <div key={request.id} className='rounded-xl border border-slate-200 p-4'><p className='font-semibold text-slate-900'>{request.target_role}</p><p className='text-sm text-slate-500'>{request.service_type === 'recruiter_session' ? 'Strategy session' : request.service_type === 'written_review' ? 'Written review' : 'Recruiter request'} · <span className='capitalize'>{request.status.replaceAll('_', ' ')}</span></p></div>)}</div>}
         </section>
       </div>
     </main>
