@@ -2,8 +2,8 @@
 // appointment schedules). Add a second recruiter's page here with a label saying which
 // hours or region it suits; the billing page shows every entry.
 export const SESSION_BOOKING_PAGES: { label: string; url: string }[] = [
-  { label: 'Book with a TalentSeek recruiter', url: 'https://calendar.app.google/5aQJZuKJV9wyXkjb8' },
-  { label: 'Book with Farah', url: 'https://calendar.app.google/oWu6A6Wb3JxnMsS78' },
+  { label: 'Book with our North America team', url: 'https://calendar.app.google/5aQJZuKJV9wyXkjb8' },
+  { label: 'Book with our Middle East team', url: 'https://calendar.app.google/oWu6A6Wb3JxnMsS78' },
 ]
 
 type Order = { product_key: string; status: string }
