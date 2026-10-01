@@ -16,7 +16,6 @@ type BillingSummary = {
 const offers = [
   { key: 'quick_apply', name: 'Quick Apply Pack', price: 'C$4.99', detail: '2 resume optimizations + 1 interview-preparation pack' },
   { key: 'job_search_pack', name: 'Job Search Pack', price: 'C$9.99', detail: '5 resume optimizations + 2 interview-preparation packs' },
-  { key: 'membership', name: 'Job Search Membership', price: 'C$12.99/month', detail: '12 resume optimizations + 5 interview-preparation packs monthly' },
 ]
 
 const recruiterOffers = [
@@ -75,7 +74,7 @@ export default function BillingPage() {
       <div className='mx-auto max-w-6xl'>
         <p className='text-sm font-semibold uppercase tracking-widest text-teal-700'>Plan and usage</p>
         <h1 className='mt-3 text-3xl font-bold tracking-tight text-slate-900 sm:text-5xl'>Choose support for your job search.</h1>
-        <p className='mt-4 max-w-3xl text-lg leading-8 text-slate-600'>Start free, buy a small pack when you need it, or use a monthly membership during an active search.</p>
+        <p className='mt-4 max-w-3xl text-lg leading-8 text-slate-600'>Start free, buy a small pack when you need it, or book time with a recruiter. No subscription.</p>
 
         {error && <p role='alert' className='mt-6 rounded-xl bg-red-50 p-4 text-red-800'>{error}</p>}
         {notice && <p role='status' className='mt-6 rounded-xl bg-teal-50 p-4 text-teal-900'>{notice}</p>}
@@ -87,7 +86,7 @@ export default function BillingPage() {
 
         <section className='mt-12'>
           <h2 className='text-2xl font-bold text-slate-900'>Self-service options</h2>
-          <div className='mt-5 grid gap-5 md:grid-cols-3'>
+          <div className='mt-5 grid gap-5 md:grid-cols-2'>
             {offers.map(offer => <article key={offer.name} className='flex flex-col rounded-2xl border border-slate-200 bg-white p-6 shadow-sm'><h3 className='text-xl font-bold text-slate-900'>{offer.name}</h3><p className='mt-3 text-3xl font-bold text-slate-900'>{offer.price}</p><p className='mt-4 flex-1 leading-7 text-slate-600'>{offer.detail}</p><button onClick={() => void startCheckout(offer.key)} disabled={!summary?.checkout_enabled || checkingOut !== null} className='mt-6 rounded-xl bg-slate-900 px-4 py-3 font-semibold text-white disabled:cursor-not-allowed disabled:opacity-55'>{checkingOut === offer.key ? 'Opening secure checkout…' : summary?.checkout_enabled ? 'Buy with Stripe' : 'Checkout setup in progress'}</button></article>)}
           </div>
         </section>
