@@ -1,19 +1,13 @@
 'use client'
 
-import { FormEvent, useState } from 'react'
+import { FormEvent, useEffect, useState } from 'react'
 import { supabase } from '../../lib/supabase'
 import { AiProcessingNotice } from '../components/AiProcessingNotice'
 import { errorDetail, outOfCreditsMessage } from '../../lib/credits'
 import { runAiJob } from '../../lib/aiJobs'
+import { InterviewPack as PreparationPack, downloadPackDocx, downloadPackPdf, packToText } from '../../lib/interviewPackExport'
 
-type PreparationPack = {
-  match_confidence: { score: number; label: string; summary: string }
-  role_summary: string
-  skills_to_demonstrate: string[]
-  likely_questions: { question: string; category: string; answer_points: string[] }[]
-  questions_to_ask: string[]
-  checklist: string[]
-}
+const LEAVE_WARNING = 'Your interview pack is not saved to your account. Download or copy it before you leave, or it will be lost.'
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
 const interviewTypes = ['Recruiter screen', 'Hiring manager', 'Technical', 'Behavioural', 'Final interview']
@@ -29,6 +23,16 @@ export default function InterviewPreparationPage() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [needsCredits, setNeedsCredits] = useState(false)
+  const [kept, setKept] = useState(false)
+  const [exportMessage, setExportMessage] = useState('')
+
+  // Packs are not stored, so warn before the tab closes until the candidate has kept a copy.
+  useEffect(() => {
+    if (!pack || kept) return
+    const warn = (event: BeforeUnloadEvent) => { event.preventDefault(); event.returnValue = '' }
+    window.addEventListener('beforeunload', warn)
+    return () => window.removeEventListener('beforeunload', warn)
+  }, [pack, kept])
 
   async function generatePack(event: FormEvent) {
     event.preventDefault()
@@ -50,20 +54,34 @@ export default function InterviewPreparationPage() {
       }
       setPack(outcome.result)
       setChecked([])
+      setKept(false)
+      setExportMessage('')
     } catch (generationError) {
       setError(generationError instanceof Error ? generationError.message : 'Unable to generate your interview preparation pack.')
     }
     setLoading(false)
   }
 
+  const packContext = { jobTitle: jobTitle.trim(), companyName: companyName.trim(), interviewType }
+  async function keepPack(action: 'copy' | 'docx' | 'pdf') {
+    if (!pack) return
+    try {
+      if (action === 'copy') { await navigator.clipboard.writeText(packToText(pack, packContext)); setExportMessage('Copied. Paste it into your notes or email it to yourself.') }
+      else if (action === 'docx') { await downloadPackDocx(pack, packContext); setExportMessage('Downloaded as a Word file.') }
+      else { downloadPackPdf(pack, packContext); setExportMessage('Downloaded as a PDF.') }
+      setKept(true)
+    } catch { setExportMessage(action === 'copy' ? 'Copying was blocked by your browser. Please use Download instead.' : 'The download did not start. Please try again.') }
+  }
+  const confirmLeave = (event: React.MouseEvent) => { if (pack && !kept && !window.confirm(LEAVE_WARNING)) event.preventDefault() }
+
   const toggleChecklist = (item: string) => setChecked(current => current.includes(item) ? current.filter(entry => entry !== item) : [...current, item])
 
   return <main className='min-h-screen bg-slate-50 px-6 py-10'><div className='mx-auto max-w-5xl'>
-    <a href='/dashboard' className='text-sm text-slate-500 hover:text-slate-700'>← Back to What would you like to do?</a>
+    <a href='/dashboard' onClick={confirmLeave} className='text-sm text-slate-500 hover:text-slate-700'>← Back to What would you like to do?</a>
     <header className='mt-6 max-w-3xl'><p className='text-sm font-semibold uppercase tracking-widest text-teal-700'>Interview preparation</p><h1 className='mt-3 text-3xl font-bold tracking-tight text-slate-900 sm:text-5xl'>Walk into your interview prepared.</h1><p className='mt-4 text-lg leading-8 text-slate-600'>Get likely questions, preparation priorities, and clear ways to connect your experience to the role.</p></header>
 
     <form onSubmit={generatePack} className='mt-10 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm'>
-      <div className='flex items-center justify-between gap-4'><div><h2 className='text-xl font-bold text-slate-900'>Interview details</h2><p className='mt-1 text-sm text-slate-500'>Your information stays in this session and is not saved by this feature.</p></div>{pack && <button type='submit' disabled={loading} className='rounded-xl border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50'>{loading ? 'Generating…' : 'Regenerate pack'}</button>}</div>
+      <div className='flex items-center justify-between gap-4'><div><h2 className='text-xl font-bold text-slate-900'>Interview details</h2><p className='mt-1 text-sm text-slate-500'>Your information stays in this session and is not saved to your account. Download or copy your pack to keep it.</p></div>{pack && <button type='submit' disabled={loading} className='rounded-xl border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50'>{loading ? 'Generating…' : 'Regenerate pack'}</button>}</div>
       <div className='mt-6 grid gap-4 md:grid-cols-2'><label className='text-sm font-medium text-slate-700'>Job title<input required value={jobTitle} onChange={event => setJobTitle(event.target.value)} className='mt-1.5 w-full rounded-xl border border-slate-300 px-3 py-2 text-slate-900' placeholder='e.g. Senior Project Manager' /></label><label className='text-sm font-medium text-slate-700'>Company<input required value={companyName} onChange={event => setCompanyName(event.target.value)} className='mt-1.5 w-full rounded-xl border border-slate-300 px-3 py-2 text-slate-900' placeholder='Company name' /></label><label className='text-sm font-medium text-slate-700'>Interview type<select value={interviewType} onChange={event => setInterviewType(event.target.value)} className='mt-1.5 w-full rounded-xl border border-slate-300 px-3 py-2 text-slate-900'>{interviewTypes.map(type => <option key={type}>{type}</option>)}</select></label></div>
       <label className='mt-4 block text-sm font-medium text-slate-700'>Job description<textarea required minLength={40} value={jobDescription} onChange={event => setJobDescription(event.target.value)} className='mt-1.5 min-h-40 w-full rounded-xl border border-slate-300 px-3 py-2 text-sm text-slate-900' placeholder='Paste the job description here.' /></label>
       <label className='mt-4 block text-sm font-medium text-slate-700'>Resume text <span className='font-normal text-slate-500'>(optional, for personalized guidance)</span><textarea value={resumeText} onChange={event => setResumeText(event.target.value)} className='mt-1.5 min-h-40 w-full rounded-xl border border-slate-300 px-3 py-2 text-sm text-slate-900' placeholder='Paste your resume here.' /></label>
@@ -72,7 +90,7 @@ export default function InterviewPreparationPage() {
       {error && <p role='alert' className='mt-4 text-sm text-red-700'>{error}{needsCredits && <a href='/billing' className='ml-2 font-semibold underline'>View plans →</a>}</p>}
     </form>
 
-    {pack && <section className='mt-8 space-y-6'><div className='grid gap-6 md:grid-cols-[220px_1fr]'><article className='rounded-2xl bg-slate-900 p-6 text-white'><p className='text-xs font-semibold uppercase tracking-wider text-teal-300'>Resume match</p><p className='mt-3 text-5xl font-bold'>{pack.match_confidence.score}%</p><p className='mt-2 font-semibold'>{pack.match_confidence.label}</p><p className='mt-3 text-sm leading-6 text-slate-300'>{pack.match_confidence.summary}</p></article><article className='rounded-2xl border border-slate-200 bg-white p-6 shadow-sm'><h2 className='text-xl font-bold text-slate-900'>What this role needs</h2><p className='mt-3 leading-7 text-slate-600'>{pack.role_summary}</p><h3 className='mt-5 text-sm font-semibold uppercase tracking-wider text-teal-700'>Skills to demonstrate</h3><div className='mt-3 flex flex-wrap gap-2'>{pack.skills_to_demonstrate.map(skill => <span key={skill} className='rounded-full bg-teal-50 px-3 py-1 text-sm text-teal-800'>{skill}</span>)}</div></article></div>
+    {pack && <section className='mt-8 space-y-6'><div className='flex flex-wrap items-center gap-3 rounded-2xl border border-amber-200 bg-amber-50 p-4'><p className='flex-1 text-sm text-amber-900'>{exportMessage || 'Keep this pack: it is not saved to your account.'}</p><button type='button' onClick={() => void keepPack('pdf')} className='rounded-lg border border-red-300 bg-white px-3 py-1.5 text-xs font-semibold text-red-700 hover:bg-red-50'>📥 PDF</button><button type='button' onClick={() => void keepPack('docx')} className='rounded-lg border border-blue-300 bg-white px-3 py-1.5 text-xs font-semibold text-blue-700 hover:bg-blue-50'>📥 Word (.docx)</button><button type='button' onClick={() => void keepPack('copy')} className='rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50'>Copy text</button></div><div className='grid gap-6 md:grid-cols-[220px_1fr]'><article className='rounded-2xl bg-slate-900 p-6 text-white'><p className='text-xs font-semibold uppercase tracking-wider text-teal-300'>Resume match</p><p className='mt-3 text-5xl font-bold'>{pack.match_confidence.score}%</p><p className='mt-2 font-semibold'>{pack.match_confidence.label}</p><p className='mt-3 text-sm leading-6 text-slate-300'>{pack.match_confidence.summary}</p></article><article className='rounded-2xl border border-slate-200 bg-white p-6 shadow-sm'><h2 className='text-xl font-bold text-slate-900'>What this role needs</h2><p className='mt-3 leading-7 text-slate-600'>{pack.role_summary}</p><h3 className='mt-5 text-sm font-semibold uppercase tracking-wider text-teal-700'>Skills to demonstrate</h3><div className='mt-3 flex flex-wrap gap-2'>{pack.skills_to_demonstrate.map(skill => <span key={skill} className='rounded-full bg-teal-50 px-3 py-1 text-sm text-teal-800'>{skill}</span>)}</div></article></div>
       <article className='rounded-2xl border border-slate-200 bg-white p-6 shadow-sm'><h2 className='text-xl font-bold text-slate-900'>Likely interview questions</h2><div className='mt-5 space-y-4'>{pack.likely_questions.map((item, index) => <details key={`${item.question}-${index}`} className='rounded-xl border border-slate-200 p-4'><summary className='cursor-pointer font-semibold text-slate-900'><span className='mr-2 text-xs font-medium uppercase tracking-wider text-teal-700'>{item.category}</span>{item.question}</summary><ul className='mt-4 list-disc space-y-2 pl-5 text-sm leading-6 text-slate-600'>{item.answer_points.map(point => <li key={point}>{point}</li>)}</ul></details>)}</div></article>
       <div className='grid gap-6 md:grid-cols-2'><article className='rounded-2xl border border-slate-200 bg-white p-6 shadow-sm'><h2 className='text-xl font-bold text-slate-900'>Questions to ask</h2><ol className='mt-4 list-decimal space-y-3 pl-5 text-sm leading-6 text-slate-600'>{pack.questions_to_ask.map(question => <li key={question}>{question}</li>)}</ol></article><article className='rounded-2xl border border-slate-200 bg-white p-6 shadow-sm'><h2 className='text-xl font-bold text-slate-900'>Interview checklist</h2><div className='mt-4 space-y-3'>{pack.checklist.map(item => <label key={item} className='flex cursor-pointer items-start gap-3 text-sm leading-6 text-slate-700'><input type='checkbox' checked={checked.includes(item)} onChange={() => toggleChecklist(item)} className='mt-1 h-4 w-4 rounded border-slate-300 text-teal-700' /><span className={checked.includes(item) ? 'text-slate-400 line-through' : ''}>{item}</span></label>)}</div></article></div>
     </section>}

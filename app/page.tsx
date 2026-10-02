@@ -181,6 +181,7 @@ export default function CandidateTool() {
   const [resumeLength, setResumeLength] = useState('2')
   const [isSavingOptimized, setIsSavingOptimized] = useState(false)
   const [optimizedSaveMessage, setOptimizedSaveMessage] = useState('')
+  const [optimizedSaved, setOptimizedSaved] = useState(false)
 
   const [user, setUser] = useState<any>(null)
   const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
@@ -231,6 +232,7 @@ export default function CandidateTool() {
   const handleOptimize = async () => {
     if (!resume.trim() || !jobDescription.trim()) { setError('Please fill in both fields'); return }
     setIsLoading(true); setError(''); setNeedsCredits(false); setOptimizedResume(''); setProfileImprovements(''); setAnalysis(null)
+    setOptimizedSaved(false); setOptimizedSaveMessage('')
     try {
       const authHeaders = await getAuthHeaders()
       const outcome = await runAiJob<{ optimized_content?: string; profile_improvements?: string }>(
@@ -246,6 +248,8 @@ export default function CandidateTool() {
       const data = outcome.result
       setOptimizedResume(data.optimized_content || '')
       setProfileImprovements(data.profile_improvements || '')
+      // Save automatically: the user spent a credit on this result and may leave the page.
+      if (data.optimized_content) void saveOptimizedResume(data.optimized_content)
 
       setIsAnalyzing(true)
       try {
@@ -263,18 +267,19 @@ export default function CandidateTool() {
     finally { setIsLoading(false) }
   }
 
-  const saveOptimizedResume = async () => {
-    if (!optimizedResume.trim()) return
+  const saveOptimizedResume = async (content: string = optimizedResume) => {
+    if (!content.trim()) return
     setIsSavingOptimized(true); setOptimizedSaveMessage('')
     const { title, company } = parseJobInfo(jobDescription)
     try {
       const response = await fetch(`${API_URL}/resume-library/optimized`, {
         method: 'POST', headers: { 'Content-Type': 'application/json', ...await getAuthHeaders() },
-        body: JSON.stringify({ title: `Optimized resume — ${title}`, content: optimizedResume, job_title: title, company_name: company }),
+        body: JSON.stringify({ title: `Optimized resume — ${title}`, content, job_title: title, company_name: company }),
       })
-      if (!response.ok) throw new Error('Unable to save this optimized resume.')
-      setOptimizedSaveMessage('Optimized resume saved securely to your account.')
-    } catch (saveError) { setOptimizedSaveMessage(saveError instanceof Error ? saveError.message : 'Unable to save this optimized resume.') }
+      if (!response.ok) throw new Error('This resume was not saved to your account. Please try again or download it.')
+      setOptimizedSaved(true)
+      setOptimizedSaveMessage('Saved to My Resumes. You can open it any time from your dashboard.')
+    } catch (saveError) { setOptimizedSaveMessage(saveError instanceof Error ? saveError.message : 'This resume was not saved to your account. Please try again or download it.') }
     setIsSavingOptimized(false)
   }
 
@@ -497,9 +502,9 @@ export default function CandidateTool() {
                   <div className='mb-3 flex items-center justify-between'>
                     <h3 className='font-semibold text-slate-800'>Optimized Resume</h3>
                     <div className='flex gap-2'>
-                      <button onClick={saveOptimizedResume} disabled={isSavingOptimized}
-                        className='rounded-lg border border-emerald-300 bg-emerald-50 px-3 py-1.5 text-xs font-medium text-emerald-700 hover:bg-emerald-100 disabled:opacity-50'>
-                        {isSavingOptimized ? 'Saving…' : 'Save to account'}
+                      <button onClick={() => void saveOptimizedResume()} disabled={isSavingOptimized || optimizedSaved}
+                        className='rounded-lg border border-emerald-300 bg-emerald-50 px-3 py-1.5 text-xs font-medium text-emerald-700 hover:bg-emerald-100 disabled:opacity-60'>
+                        {isSavingOptimized ? 'Saving…' : optimizedSaved ? 'Saved ✓' : 'Save to account'}
                       </button>
                       <button onClick={downloadDocx}
                         className='rounded-lg border border-blue-300 bg-blue-50 px-3 py-1.5 text-xs font-medium text-blue-700 hover:bg-blue-100'>
@@ -511,7 +516,7 @@ export default function CandidateTool() {
                       </button>
                     </div>
                   </div>
-                  {optimizedSaveMessage && <p className='mb-3 text-xs text-slate-500'>{optimizedSaveMessage}</p>}
+                  {optimizedSaveMessage && <p className='mb-3 text-xs text-slate-500'>{optimizedSaveMessage}{optimizedSaved && <> <a href='/my-resumes' className='font-semibold text-slate-700 underline'>Open My Resumes</a></>}</p>}
                   <pre className='max-h-56 overflow-y-auto whitespace-pre-wrap rounded-xl bg-slate-100 p-4 text-sm text-slate-800'>{optimizedResume}</pre>
                 </div>
 
