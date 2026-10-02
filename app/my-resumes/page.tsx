@@ -4,9 +4,7 @@ import Link from 'next/link'
 import { useEffect, useState } from 'react'
 import { supabase } from '../../lib/supabase'
 import { setInterviewPrefill } from '../../lib/interviewPrefill'
-import { AlignmentType, BorderStyle, Document, Packer, Paragraph, TextRun } from 'docx'
-import { saveAs } from 'file-saver'
-import jsPDF from 'jspdf'
+import { downloadResumeDocx, downloadResumePdf } from '../../lib/resumeLayout'
 
 type MasterResume = { id: string; content: string; updated_at: string }
 type OptimizedResume = { id: string; title: string; content: string; job_title?: string; company_name?: string; created_at: string }
@@ -22,63 +20,14 @@ function downloadText(filename: string, content: string) {
   URL.revokeObjectURL(link.href)
 }
 
-function classifyLine(line: string, lineIndex: number, allLines: string[]): { type: 'name' | 'contact' | 'section' | 'job-date' | 'bullet' | 'skills' | 'empty' | 'text'; text: string } {
-  const text = line.trim()
-  if (!text) return { type: 'empty', text: '' }
-  if (lineIndex === allLines.findIndex(entry => entry.trim())) return { type: 'name', text }
-  let nonEmptyCount = 0
-  for (let index = 0; index <= lineIndex; index++) if (allLines[index].trim()) nonEmptyCount++
-  if (nonEmptyCount === 2) return { type: 'contact', text }
-  if (/^[A-Z][A-Z\s&/()]{3,}$/.test(text)) return { type: 'section', text }
-  if (text.startsWith('- ')) return { type: 'bullet', text: text.slice(2).trim() }
-  if ((text.match(/\|/g) || []).length >= 2) return { type: 'skills', text }
-  if (/\d{4}/.test(text) && text.length < 40) return { type: 'job-date', text }
-  return { type: 'text', text }
-}
-
-function buildDocxParagraphs(content: string): Paragraph[] {
-  const lines = content.split('\n')
-  return lines.map((line, index) => {
-    const { type, text } = classifyLine(line, index, lines)
-    if (type === 'empty') return new Paragraph({ children: [], spacing: { after: 40 } })
-    if (type === 'name') return new Paragraph({ children: [new TextRun({ text, bold: true, size: 36, font: 'Calibri', color: '1E3A5F' })], alignment: AlignmentType.LEFT, spacing: { after: 40 } })
-    if (type === 'contact') return new Paragraph({ children: [new TextRun({ text, size: 18, font: 'Calibri', color: '555555' })], spacing: { after: 120 } })
-    if (type === 'section') return new Paragraph({ children: [new TextRun({ text: text.toUpperCase(), bold: true, size: 22, font: 'Calibri', color: '1E3A5F' })], spacing: { before: 240, after: 80 }, border: { bottom: { color: '1E3A5F', size: 6, space: 1, style: BorderStyle.SINGLE } } })
-    if (type === 'skills') return new Paragraph({ children: text.split('|').flatMap((part, partIndex, parts) => [new TextRun({ text: part.trim(), size: 19, font: 'Calibri' }), ...(partIndex < parts.length - 1 ? [new TextRun({ text: '  |  ', size: 19, font: 'Calibri', color: '888888' })] : [])]), spacing: { after: 60 } })
-    if (type === 'job-date') return new Paragraph({ children: [new TextRun({ text, size: 18, font: 'Calibri', color: '666666', italics: true })], spacing: { after: 60 } })
-    if (type === 'bullet') return new Paragraph({ children: [new TextRun({ text, size: 19, font: 'Calibri' })], bullet: { level: 0 }, spacing: { after: 60 }, indent: { left: 360 } })
-    return new Paragraph({ children: [new TextRun({ text, size: 20, font: 'Calibri', bold: /^[A-Z]/.test(text) && text.length < 80 && !text.endsWith('.') })], spacing: { after: 60 } })
-  })
-}
-
+// Saved resumes don't record the length that was chosen, so downloads only avoid a
+// nearly empty last page (see lib/resumeLayout).
 async function downloadDocx(filename: string, content: string) {
-  const document = new Document({ sections: [{ properties: { page: { margin: { top: 720, bottom: 720, left: 1080, right: 1080 } } }, children: buildDocxParagraphs(content) }] })
-  saveAs(await Packer.toBlob(document), `${safeFilename(filename)}.docx`)
+  await downloadResumeDocx(content, safeFilename(filename), null)
 }
 
 function downloadPdf(filename: string, content: string) {
-  const pdf = new jsPDF({ unit: 'pt', format: 'letter' })
-  const margin = 60
-  const pageW = pdf.internal.pageSize.getWidth()
-  const pageH = pdf.internal.pageSize.getHeight()
-  const maxW = pageW - margin * 2
-  let y = margin
-  const checkPage = (height: number) => { if (y + height > pageH - margin) { pdf.addPage(); y = margin } }
-  const lines = content.split('\n')
-  lines.forEach((line, index) => {
-    const { type, text } = classifyLine(line, index, lines)
-    if (type === 'empty') { y += 5; return }
-    if (type === 'name') { checkPage(32); pdf.setFont('helvetica', 'bold'); pdf.setFontSize(18); pdf.setTextColor(30, 58, 95); pdf.text(text, margin, y); y += 24; pdf.setTextColor(0, 0, 0); return }
-    if (type === 'contact') { checkPage(16); pdf.setFont('helvetica', 'normal'); pdf.setFontSize(9); pdf.setTextColor(80, 80, 80); pdf.text(text, margin, y); y += 18; pdf.setTextColor(0, 0, 0); return }
-    if (type === 'section') { checkPage(28); y += 10; pdf.setFont('helvetica', 'bold'); pdf.setFontSize(11); pdf.setTextColor(30, 58, 95); pdf.text(text.toUpperCase(), margin, y); y += 4; pdf.setDrawColor(30, 58, 95); pdf.setLineWidth(0.75); pdf.line(margin, y, pageW - margin, y); y += 14; pdf.setFont('helvetica', 'normal'); pdf.setFontSize(10); pdf.setTextColor(0, 0, 0); return }
-    if (type === 'job-date') { checkPage(14); pdf.setFont('helvetica', 'italic'); pdf.setFontSize(9); pdf.setTextColor(100, 100, 100); pdf.text(text, margin, y); y += 14; pdf.setFont('helvetica', 'normal'); pdf.setTextColor(0, 0, 0); return }
-    if (type === 'skills') { pdf.setFont('helvetica', 'normal'); pdf.setFontSize(9.5); pdf.splitTextToSize(text, maxW).forEach((wrapped: string) => { checkPage(14); pdf.text(wrapped, margin, y); y += 14 }); return }
-    if (type === 'bullet') { pdf.setFont('helvetica', 'normal'); pdf.setFontSize(10); pdf.splitTextToSize(`•  ${text}`, maxW - 15).forEach((wrapped: string, wrappedIndex: number) => { checkPage(13); pdf.text(wrapped, margin + (wrappedIndex === 0 ? 0 : 10), y); y += 13 }); return }
-    const bold = /^[A-Z]/.test(text) && text.length < 80 && !text.endsWith('.')
-    pdf.setFont('helvetica', bold ? 'bold' : 'normal'); pdf.setFontSize(10)
-    pdf.splitTextToSize(text, maxW).forEach((wrapped: string) => { checkPage(14); pdf.text(wrapped, margin, y); y += 14 })
-  })
-  pdf.save(`${safeFilename(filename)}.pdf`)
+  downloadResumePdf(content, safeFilename(filename), null)
 }
 
 export default function MyResumesPage() {
