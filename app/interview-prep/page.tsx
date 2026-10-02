@@ -6,6 +6,9 @@ import { AiProcessingNotice } from '../components/AiProcessingNotice'
 import { errorDetail, outOfCreditsMessage } from '../../lib/credits'
 import { runAiJob } from '../../lib/aiJobs'
 import { InterviewPack as PreparationPack, downloadPackDocx, downloadPackPdf, packToText } from '../../lib/interviewPackExport'
+import { takeInterviewPrefill } from '../../lib/interviewPrefill'
+
+type SavedResume = { key: string; label: string; content: string; jobTitle?: string; companyName?: string }
 
 const LEAVE_WARNING = 'Your interview pack is not saved to your account. Download or copy it before you leave, or it will be lost.'
 
@@ -25,6 +28,64 @@ export default function InterviewPreparationPage() {
   const [needsCredits, setNeedsCredits] = useState(false)
   const [kept, setKept] = useState(false)
   const [exportMessage, setExportMessage] = useState('')
+  const [savedResumes, setSavedResumes] = useState<SavedResume[]>([])
+  const [resumeSource, setResumeSource] = useState('')
+  const [uploading, setUploading] = useState<'' | 'resume' | 'job'>('')
+
+  async function authHeaders(): Promise<Record<string, string>> {
+    const { data } = await supabase.auth.getSession()
+    return data.session ? { Authorization: `Bearer ${data.session.access_token}` } : {}
+  }
+
+  // Offer the user's saved resumes, and pick up one sent from My Resumes.
+  useEffect(() => {
+    const prefill = takeInterviewPrefill()
+    if (prefill) {
+      setResumeText(prefill.resumeText)
+      setResumeSource(prefill.resumeLabel)
+      if (prefill.jobTitle) setJobTitle(prefill.jobTitle)
+      if (prefill.companyName) setCompanyName(prefill.companyName)
+    }
+    void (async () => {
+      try {
+        const headers = await authHeaders()
+        const [masterResponse, optimizedResponse] = await Promise.all([
+          fetch(`${API_URL}/resume-library/master`, { headers }),
+          fetch(`${API_URL}/resume-library/optimized`, { headers }),
+        ])
+        const master = masterResponse.ok ? await masterResponse.json() : null
+        const optimized: { id: string; title: string; content: string; job_title?: string; company_name?: string }[] = optimizedResponse.ok ? await optimizedResponse.json() : []
+        setSavedResumes([
+          ...(master?.content ? [{ key: 'master', label: 'Master resume', content: master.content }] : []),
+          ...optimized.map(item => ({ key: item.id, label: item.title, content: item.content, jobTitle: item.job_title || undefined, companyName: item.company_name || undefined })),
+        ])
+      } catch { /* the picker simply stays hidden */ }
+    })()
+  }, [])
+
+  function chooseSavedResume(key: string) {
+    const resume = savedResumes.find(item => item.key === key)
+    if (!resume) return
+    setResumeText(resume.content)
+    setResumeSource(resume.label)
+    if (!jobTitle.trim() && resume.jobTitle) setJobTitle(resume.jobTitle)
+    if (!companyName.trim() && resume.companyName) setCompanyName(resume.companyName)
+  }
+
+  async function uploadFile(file: File, target: 'resume' | 'job') {
+    setUploading(target); setError('')
+    try {
+      const formData = new FormData()
+      formData.append('file', file)
+      const response = await fetch(`${API_URL}/resumes/parse-demo`, { method: 'POST', headers: await authHeaders(), body: formData })
+      const data = response.ok ? await response.json() : null
+      if (!data?.text) throw new Error(data?.error || errorDetail(data, 'We could not read that file. Please upload a PDF or Word file, or paste the text.'))
+      if (target === 'resume') { setResumeText(data.text); setResumeSource(file.name) } else setJobDescription(data.text)
+    } catch (uploadError) {
+      setError(uploadError instanceof Error ? uploadError.message : 'Upload failed. Please paste the text instead.')
+    }
+    setUploading('')
+  }
 
   // Packs are not stored, so warn before the tab closes until the candidate has kept a copy.
   useEffect(() => {
@@ -83,8 +144,8 @@ export default function InterviewPreparationPage() {
     <form onSubmit={generatePack} className='mt-10 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm'>
       <div className='flex items-center justify-between gap-4'><div><h2 className='text-xl font-bold text-slate-900'>Interview details</h2><p className='mt-1 text-sm text-slate-500'>Your information stays in this session and is not saved to your account. Download or copy your pack to keep it.</p></div>{pack && <button type='submit' disabled={loading} className='rounded-xl border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50'>{loading ? 'Generating…' : 'Regenerate pack'}</button>}</div>
       <div className='mt-6 grid gap-4 md:grid-cols-2'><label className='text-sm font-medium text-slate-700'>Job title<input required value={jobTitle} onChange={event => setJobTitle(event.target.value)} className='mt-1.5 w-full rounded-xl border border-slate-300 px-3 py-2 text-slate-900' placeholder='e.g. Senior Project Manager' /></label><label className='text-sm font-medium text-slate-700'>Company<input required value={companyName} onChange={event => setCompanyName(event.target.value)} className='mt-1.5 w-full rounded-xl border border-slate-300 px-3 py-2 text-slate-900' placeholder='Company name' /></label><label className='text-sm font-medium text-slate-700'>Interview type<select value={interviewType} onChange={event => setInterviewType(event.target.value)} className='mt-1.5 w-full rounded-xl border border-slate-300 px-3 py-2 text-slate-900'>{interviewTypes.map(type => <option key={type}>{type}</option>)}</select></label></div>
-      <label className='mt-4 block text-sm font-medium text-slate-700'>Job description<textarea required minLength={40} value={jobDescription} onChange={event => setJobDescription(event.target.value)} className='mt-1.5 min-h-40 w-full rounded-xl border border-slate-300 px-3 py-2 text-sm text-slate-900' placeholder='Paste the job description here.' /></label>
-      <label className='mt-4 block text-sm font-medium text-slate-700'>Resume text <span className='font-normal text-slate-500'>(optional, for personalized guidance)</span><textarea value={resumeText} onChange={event => setResumeText(event.target.value)} className='mt-1.5 min-h-40 w-full rounded-xl border border-slate-300 px-3 py-2 text-sm text-slate-900' placeholder='Paste your resume here.' /></label>
+      <div className='mt-4'><div className='flex flex-wrap items-center justify-between gap-2'><span className='text-sm font-medium text-slate-700'>Job description</span><label className='cursor-pointer rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50'>{uploading === 'job' ? 'Reading file…' : '📄 Upload PDF or Word'}<input type='file' accept='.pdf,.docx' className='hidden' disabled={uploading !== ''} onChange={event => { const file = event.target.files?.[0]; if (file) void uploadFile(file, 'job'); event.target.value = '' }} /></label></div><textarea required minLength={40} value={jobDescription} onChange={event => setJobDescription(event.target.value)} aria-label='Job description' className='mt-1.5 min-h-40 w-full rounded-xl border border-slate-300 px-3 py-2 text-sm text-slate-900' placeholder='Paste the job description here.' /></div>
+      <div className='mt-4'><div className='flex flex-wrap items-center justify-between gap-2'><span className='text-sm font-medium text-slate-700'>Your resume <span className='font-normal text-slate-500'>(recommended: makes the pack about your own experience)</span></span><div className='flex flex-wrap gap-2'>{savedResumes.length > 0 && <select value='' onChange={event => chooseSavedResume(event.target.value)} aria-label='Use a saved resume' className='rounded-lg border border-slate-300 bg-white px-2 py-1.5 text-xs font-semibold text-slate-700'><option value=''>Use a saved resume…</option>{savedResumes.map(item => <option key={item.key} value={item.key}>{item.label}</option>)}</select>}<label className='cursor-pointer rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50'>{uploading === 'resume' ? 'Reading file…' : '📄 Upload PDF or Word'}<input type='file' accept='.pdf,.docx' className='hidden' disabled={uploading !== ''} onChange={event => { const file = event.target.files?.[0]; if (file) void uploadFile(file, 'resume'); event.target.value = '' }} /></label></div></div>{resumeSource && resumeText && <p className='mt-1.5 text-xs text-teal-700'>Using: {resumeSource}</p>}<textarea value={resumeText} onChange={event => { setResumeText(event.target.value); if (!event.target.value) setResumeSource('') }} aria-label='Your resume' className='mt-1.5 min-h-40 w-full rounded-xl border border-slate-300 px-3 py-2 text-sm text-slate-900' placeholder='Paste your resume, upload a file, or choose a saved resume.' /></div>
       <AiProcessingNotice />
       {!pack && <button disabled={loading} className='mt-6 rounded-xl bg-slate-900 px-5 py-3 text-sm font-semibold text-white hover:bg-slate-700 disabled:opacity-50'>{loading ? 'Creating your preparation pack…' : 'Generate interview plan →'}</button>}
       {error && <p role='alert' className='mt-4 text-sm text-red-700'>{error}{needsCredits && <a href='/billing' className='ml-2 font-semibold underline'>View plans →</a>}</p>}
