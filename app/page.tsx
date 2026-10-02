@@ -6,12 +6,9 @@ import { errorDetail, outOfCreditsMessage } from '../lib/credits'
 import { runAiJob } from '../lib/aiJobs'
 import { LoadingSpinner } from './components/LoadingSpinner'
 import { AiProcessingNotice } from './components/AiProcessingNotice'
-import {
-  Document, Packer, Paragraph, TextRun, BorderStyle,
-  AlignmentType, UnderlineType
-} from 'docx'
+import { Document, Packer, Paragraph, TextRun } from 'docx'
 import { saveAs } from 'file-saver'
-import jsPDF from 'jspdf'
+import { downloadResumeDocx, downloadResumePdf } from '../lib/resumeLayout'
 
 function getInitials(name: string): string {
   return name.trim().split(/\s+/).map(w => w[0]?.toUpperCase() || '').join('')
@@ -34,120 +31,6 @@ function buildFilename(resumeText: string, jdText: string): string {
   const titleAbbr = title.split(/\s+/).map(w => w[0]?.toUpperCase() || '').join('')
   const companyClean = company.replace(/\s+/g, '')
   return `${initials}-${titleAbbr}-${companyClean}`
-}
-
-// Classify each line for formatting
-function classifyLine(line: string, lineIndex: number, allLines: string[]): {
-  type: 'name' | 'contact' | 'section' | 'job-company' | 'job-title' | 'job-date' | 'bullet' | 'skills' | 'empty' | 'text'
-  text: string
-} {
-  const trimmed = line.trim()
-  if (!trimmed) return { type: 'empty', text: '' }
-
-  // First non-empty line = name
-  const firstNonEmpty = allLines.findIndex(l => l.trim())
-  if (lineIndex === firstNonEmpty) return { type: 'name', text: trimmed }
-
-  // Second non-empty line = contact
-  let count = 0
-  for (let i = 0; i < allLines.length; i++) {
-    if (allLines[i].trim()) {
-      count++
-      if (count === 2 && i === lineIndex) return { type: 'contact', text: trimmed }
-    }
-  }
-
-  // ALL CAPS line = section heading
-  if (/^[A-Z][A-Z\s&/()]{3,}$/.test(trimmed)) return { type: 'section', text: trimmed }
-
-  // Bullet point
-  if (trimmed.startsWith('- ')) return { type: 'bullet', text: trimmed.slice(2).trim() }
-
-  // Skills line (contains multiple | separators)
-  if ((trimmed.match(/\|/g) || []).length >= 2) return { type: 'skills', text: trimmed }
-
-  // Date line
-  if (/\d{4}/.test(trimmed) && trimmed.length < 40) return { type: 'job-date', text: trimmed }
-
-  return { type: 'text', text: trimmed }
-}
-
-function buildDocxParagraphs(resumeText: string): Paragraph[] {
-  const lines = resumeText.split('\n')
-  const paragraphs: Paragraph[] = []
-
-  lines.forEach((line, i) => {
-    const { type, text } = classifyLine(line, i, lines)
-
-    if (type === 'empty') {
-      paragraphs.push(new Paragraph({ children: [], spacing: { after: 40 } }))
-      return
-    }
-
-    if (type === 'name') {
-      paragraphs.push(new Paragraph({
-        children: [new TextRun({ text, bold: true, size: 36, font: 'Calibri', color: '1E3A5F' })],
-        alignment: AlignmentType.LEFT,
-        spacing: { after: 40 },
-      }))
-      return
-    }
-
-    if (type === 'contact') {
-      paragraphs.push(new Paragraph({
-        children: [new TextRun({ text, size: 18, font: 'Calibri', color: '555555' })],
-        spacing: { after: 120 },
-      }))
-      return
-    }
-
-    if (type === 'section') {
-      paragraphs.push(new Paragraph({
-        children: [new TextRun({ text: text.toUpperCase(), bold: true, size: 22, font: 'Calibri', color: '1E3A5F' })],
-        spacing: { before: 240, after: 80 },
-        border: { bottom: { color: '1E3A5F', size: 6, space: 1, style: BorderStyle.SINGLE } },
-      }))
-      return
-    }
-
-    if (type === 'skills') {
-      const parts = text.split('|').map(s => s.trim())
-      const runs: TextRun[] = []
-      parts.forEach((part, idx) => {
-        runs.push(new TextRun({ text: part, size: 19, font: 'Calibri' }))
-        if (idx < parts.length - 1) runs.push(new TextRun({ text: '  |  ', size: 19, font: 'Calibri', color: '888888' }))
-      })
-      paragraphs.push(new Paragraph({ children: runs, spacing: { after: 60 } }))
-      return
-    }
-
-    if (type === 'job-date') {
-      paragraphs.push(new Paragraph({
-        children: [new TextRun({ text, size: 18, font: 'Calibri', color: '666666', italics: true })],
-        spacing: { after: 60 },
-      }))
-      return
-    }
-
-    if (type === 'bullet') {
-      paragraphs.push(new Paragraph({
-        children: [new TextRun({ text, size: 19, font: 'Calibri' })],
-        bullet: { level: 0 },
-        spacing: { after: 60 },
-        indent: { left: 360 },
-      }))
-      return
-    }
-
-    // Default text — could be company/job title
-    const isBoldLike = /^[A-Z]/.test(text) && text.length < 80 && !text.endsWith('.')
-    paragraphs.push(new Paragraph({
-      children: [new TextRun({ text, size: 20, font: 'Calibri', bold: isBoldLike })],
-      spacing: { after: 60 },
-    }))
-  })
-
-  return paragraphs
 }
 
 type AnalysisResult = {
@@ -179,6 +62,8 @@ export default function CandidateTool() {
   const [uploadingResume, setUploadingResume] = useState(false)
   const [uploadingJD, setUploadingJD] = useState(false)
   const [resumeLength, setResumeLength] = useState('2')
+  // The length chosen for the result on screen (the buttons may change afterwards).
+  const [optimizedLength, setOptimizedLength] = useState(2)
   const [isSavingOptimized, setIsSavingOptimized] = useState(false)
   const [optimizedSaveMessage, setOptimizedSaveMessage] = useState('')
   const [optimizedSaved, setOptimizedSaved] = useState(false)
@@ -247,6 +132,7 @@ export default function CandidateTool() {
       }
       const data = outcome.result
       setOptimizedResume(data.optimized_content || '')
+      setOptimizedLength(Number(resumeLength))
       setProfileImprovements(data.profile_improvements || '')
       // Save automatically: the user spent a credit on this result and may leave the page.
       if (data.optimized_content) void saveOptimizedResume(data.optimized_content)
@@ -283,15 +169,11 @@ export default function CandidateTool() {
     setIsSavingOptimized(false)
   }
 
+  // '3' means "Detailed": no page limit, only avoid a nearly empty last page.
+  const targetPages = () => (optimizedLength >= 3 ? null : optimizedLength)
+
   const downloadDocx = async () => {
-    const filename = buildFilename(optimizedResume, jobDescription)
-    const doc = new Document({
-      sections: [{
-        properties: { page: { margin: { top: 720, bottom: 720, left: 1080, right: 1080 } } },
-        children: buildDocxParagraphs(optimizedResume),
-      }]
-    })
-    saveAs(await Packer.toBlob(doc), `${filename}.docx`)
+    await downloadResumeDocx(optimizedResume, buildFilename(optimizedResume, jobDescription), targetPages())
   }
 
   const downloadProfileImprovements = async () => {
@@ -345,68 +227,7 @@ export default function CandidateTool() {
   }
 
   const downloadPdf = () => {
-    const filename = buildFilename(optimizedResume, jobDescription)
-    const doc = new jsPDF({ unit: 'pt', format: 'letter' })
-    const margin = 60
-    const pageW = doc.internal.pageSize.getWidth()
-    const pageH = doc.internal.pageSize.getHeight()
-    const maxW = pageW - margin * 2
-    let y = margin
-    const checkPage = (n: number) => { if (y + n > pageH - margin) { doc.addPage(); y = margin } }
-
-    const lines = optimizedResume.split('\n')
-    lines.forEach((line, i) => {
-      const { type, text } = classifyLine(line, i, lines)
-      if (type === 'empty') { y += 5; return }
-
-      if (type === 'name') {
-        checkPage(32)
-        doc.setFont('helvetica', 'bold'); doc.setFontSize(18); doc.setTextColor(30, 58, 95)
-        doc.text(text, margin, y); y += 24
-        doc.setTextColor(0, 0, 0)
-
-      } else if (type === 'contact') {
-        checkPage(16)
-        doc.setFont('helvetica', 'normal'); doc.setFontSize(9); doc.setTextColor(80, 80, 80)
-        doc.text(text, margin, y); y += 18
-        doc.setTextColor(0, 0, 0)
-
-      } else if (type === 'section') {
-        checkPage(28); y += 10
-        doc.setFont('helvetica', 'bold'); doc.setFontSize(11); doc.setTextColor(30, 58, 95)
-        doc.text(text.toUpperCase(), margin, y); y += 4
-        doc.setDrawColor(30, 58, 95); doc.setLineWidth(0.75)
-        doc.line(margin, y, pageW - margin, y); y += 14
-        doc.setFont('helvetica', 'normal'); doc.setFontSize(10); doc.setTextColor(0, 0, 0)
-
-      } else if (type === 'job-date') {
-        checkPage(14)
-        doc.setFont('helvetica', 'italic'); doc.setFontSize(9); doc.setTextColor(100, 100, 100)
-        doc.text(text, margin, y); y += 14
-        doc.setFont('helvetica', 'normal'); doc.setTextColor(0, 0, 0)
-
-      } else if (type === 'skills') {
-        checkPage(14)
-        doc.setFont('helvetica', 'normal'); doc.setFontSize(9.5)
-        const wrapped = doc.splitTextToSize(text, maxW)
-        wrapped.forEach((l: string) => { checkPage(14); doc.text(l, margin, y); y += 14 })
-
-      } else if (type === 'bullet') {
-        doc.setFont('helvetica', 'normal'); doc.setFontSize(10)
-        const wrapped = doc.splitTextToSize('•  ' + text, maxW - 15)
-        wrapped.forEach((l: string, idx: number) => {
-          checkPage(13)
-          doc.text(l, margin + (idx === 0 ? 0 : 10), y); y += 13
-        })
-
-      } else {
-        const isBold = /^[A-Z]/.test(text) && text.length < 80 && !text.endsWith('.')
-        doc.setFont('helvetica', isBold ? 'bold' : 'normal'); doc.setFontSize(10)
-        const wrapped = doc.splitTextToSize(text, maxW)
-        wrapped.forEach((l: string) => { checkPage(14); doc.text(l, margin, y); y += 14 })
-      }
-    })
-    doc.save(`${filename}.pdf`)
+    downloadResumePdf(optimizedResume, buildFilename(optimizedResume, jobDescription), targetPages())
   }
 
   const getMatchColor = (score: number) =>
