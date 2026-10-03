@@ -143,7 +143,7 @@ export default function MasterResume() {
         if (data.text) {
           setFiles(prev => [...prev, { name: file.name, text: data.text }])
         } else {
-          setError('Could not extract text from ' + file.name)
+          setError(data.error || 'Could not extract text from ' + file.name)
         }
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Upload failed')
