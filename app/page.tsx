@@ -62,6 +62,8 @@ export default function CandidateTool() {
   const [uploadingResume, setUploadingResume] = useState(false)
   const [uploadingJD, setUploadingJD] = useState(false)
   const [resumeLength, setResumeLength] = useState('2')
+  const [savedResumes, setSavedResumes] = useState<{ key: string; label: string; content: string }[]>([])
+  const [resumeSource, setResumeSource] = useState('')
   // The length chosen for the result on screen (the buttons may change afterwards).
   const [optimizedLength, setOptimizedLength] = useState(2)
   const [isSavingOptimized, setIsSavingOptimized] = useState(false)
@@ -78,6 +80,22 @@ export default function CandidateTool() {
       setJobDescription(storedJobDescription)
       sessionStorage.removeItem('talentseek-job-description')
     }
+    // Saved master and optimized resumes for the "Use a saved resume" picker (same as interview prep).
+    void (async () => {
+      try {
+        const headers = await getAuthHeaders()
+        const [masterResponse, optimizedResponse] = await Promise.all([
+          fetch(`${API_URL}/resume-library/master`, { headers }),
+          fetch(`${API_URL}/resume-library/optimized`, { headers }),
+        ])
+        const master = masterResponse.ok ? await masterResponse.json() : null
+        const optimized: { id: string; title: string; content: string }[] = optimizedResponse.ok ? await optimizedResponse.json() : []
+        setSavedResumes([
+          ...(master?.content ? [{ key: 'master', label: 'Master resume', content: master.content }] : []),
+          ...optimized.map(item => ({ key: item.id, label: item.title, content: item.content })),
+        ])
+      } catch { /* the picker simply stays hidden */ }
+    })()
   }, [])
 
   const getAuthHeaders = async (): Promise<Record<string, string>> => {
@@ -108,7 +126,7 @@ export default function CandidateTool() {
   }
 
   const handleResumeFile = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]; if (file) parseFile(file, setResume, setUploadingResume)
+    const file = e.target.files?.[0]; if (file) { setResumeSource(''); parseFile(file, setResume, setUploadingResume) }
   }
   const handleJDFile = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]; if (file) parseFile(file, setJobDescription, setUploadingJD)
@@ -257,13 +275,24 @@ export default function CandidateTool() {
 
         <div className='grid gap-8 lg:grid-cols-2'>
           <section className='rounded-2xl bg-white p-6 shadow-sm'>
-            <h2 className='mb-3 text-xl font-semibold text-slate-900'>Your Resume</h2>
+            <div className='mb-3 flex flex-wrap items-center justify-between gap-2'>
+              <h2 className='text-xl font-semibold text-slate-900'>Your Resume</h2>
+              {savedResumes.length > 0 && (
+                <select value='' aria-label='Use a saved resume'
+                  onChange={(e) => { const saved = savedResumes.find(item => item.key === e.target.value); if (saved) { setResume(saved.content); setResumeSource(saved.label) } }}
+                  className='rounded-lg border border-slate-300 bg-white px-2 py-1.5 text-xs font-semibold text-slate-700'>
+                  <option value=''>Use a saved resume…</option>
+                  {savedResumes.map(item => <option key={item.key} value={item.key}>{item.label}</option>)}
+                </select>
+              )}
+            </div>
             <label className='mb-3 flex cursor-pointer items-center gap-2 rounded-xl border border-dashed border-slate-300 px-4 py-3 text-sm text-slate-600 hover:border-slate-400'>
               <input type='file' accept='.pdf,.docx' className='hidden' onChange={handleResumeFile} disabled={uploadingResume} />
               {uploadingResume ? 'Extracting...' : '📎 Upload PDF or Word'}
             </label>
-            <textarea value={resume} onChange={(e) => setResume(e.target.value)}
-              placeholder='Or paste your resume here...'
+            {resumeSource && resume && <p className='mb-2 text-xs text-teal-700'>Using: {resumeSource}</p>}
+            <textarea value={resume} onChange={(e) => { setResume(e.target.value); if (!e.target.value) setResumeSource('') }}
+              placeholder='Or paste your resume here, or choose a saved resume above...'
               className='min-h-[160px] w-full rounded-xl border border-slate-300 p-4 text-sm text-slate-900 outline-none focus:border-slate-500' />
             <AiProcessingNotice />
 
