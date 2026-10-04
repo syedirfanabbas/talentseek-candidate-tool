@@ -52,6 +52,9 @@ type AnalysisResult = {
 export default function CandidateTool() {
   const [resume, setResume] = useState('')
   const [jobDescription, setJobDescription] = useState('')
+  const [jobLink, setJobLink] = useState('')
+  const [isFetchingJob, setIsFetchingJob] = useState(false)
+  const [jobLinkError, setJobLinkError] = useState('')
   const [optimizedResume, setOptimizedResume] = useState('')
   const [profileImprovements, setProfileImprovements] = useState('')
   const [analysis, setAnalysis] = useState<AnalysisResult | null>(null)
@@ -123,6 +126,23 @@ export default function CandidateTool() {
       if (data.text) { setter(data.text) } else { setError(data.error || 'Could not extract text') }
     } catch (err) { setError(err instanceof Error ? err.message : 'Upload failed') }
     finally { setUploading(false) }
+  }
+
+  const fetchJobText = async () => {
+    if (!jobLink.trim()) { setJobLinkError('Paste a job link first.'); return }
+    setIsFetchingJob(true); setJobLinkError(''); setError('')
+    try {
+      const response = await fetch(`${API_URL}/resumes/fetch-job`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...await getAuthHeaders() },
+        body: JSON.stringify({ url: jobLink.trim() }),
+      })
+      const data = await response.json()
+      if (!response.ok || !data.text) throw new Error(data.error || 'We could not read that job page. Please paste the description instead.')
+      setJobDescription(data.text)
+    } catch (fetchError) {
+      setJobLinkError(fetchError instanceof Error ? fetchError.message : 'We could not read that job page. Please paste the description instead.')
+    } finally { setIsFetchingJob(false) }
   }
 
   const handleResumeFile = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -297,6 +317,15 @@ export default function CandidateTool() {
             <AiProcessingNotice />
 
             <h2 className='mb-3 mt-5 text-xl font-semibold text-slate-900'>Job Description</h2>
+            <div className='mb-3 flex flex-col gap-2 sm:flex-row'>
+              <input value={jobLink} onChange={(e) => setJobLink(e.target.value)} type='url' placeholder='Paste a job link' aria-label='Job link'
+                className='min-w-0 flex-1 rounded-xl border border-slate-300 px-4 py-3 text-sm text-slate-900 outline-none focus:border-slate-500' />
+              <button type='button' onClick={() => void fetchJobText()} disabled={isFetchingJob}
+                className='rounded-xl bg-slate-900 px-4 py-3 text-sm font-medium text-white disabled:opacity-50'>
+                {isFetchingJob ? 'Getting text…' : 'Get job text'}
+              </button>
+            </div>
+            {jobLinkError && <p className='mb-3 text-sm text-red-700'>{jobLinkError}</p>}
             <label className='mb-3 flex cursor-pointer items-center gap-2 rounded-xl border border-dashed border-slate-300 px-4 py-3 text-sm text-slate-600 hover:border-slate-400'>
               <input type='file' accept='.pdf,.docx' className='hidden' onChange={handleJDFile} disabled={uploadingJD} />
               {uploadingJD ? 'Extracting...' : '📎 Upload PDF or Word'}
