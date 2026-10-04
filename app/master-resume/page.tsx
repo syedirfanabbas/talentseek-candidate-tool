@@ -264,7 +264,7 @@ export default function MasterResume() {
         <div className='grid gap-8 lg:grid-cols-2'>
           <section className='rounded-2xl bg-white p-6 shadow-sm'>
             <h2 className='mb-1 text-xl font-semibold text-slate-900'>Upload Your Resumes</h2>
-            <p className='mb-4 text-sm text-slate-500'>Upload up to {MAX_RESUMES} versions of your resume. Claude will merge them into one comprehensive master resume.</p>
+            <p className='mb-4 text-sm text-slate-500'>A master resume is your complete career record, built from all your old resume versions. It is not the resume you send to employers: use it as the starting point when you tailor a resume to a job. Select 2 or more versions at once (up to {MAX_RESUMES}); the more you add, the more complete it is.</p>
 
             {files.length < MAX_RESUMES && (
               <label className='mb-4 flex cursor-pointer flex-col items-center gap-2 rounded-xl border-2 border-dashed border-slate-300 px-4 py-6 text-slate-500 hover:border-slate-400'>
@@ -334,7 +334,7 @@ export default function MasterResume() {
             {!masterResume && !isLoading && (
               <div className='rounded-xl border border-dashed border-slate-300 p-8 text-center text-slate-500'>
                 <p className='text-4xl mb-3'>📋</p>
-                <p className='text-sm'>Upload multiple resume versions and click Build Master Resume. Claude will merge them into one comprehensive document.</p>
+                <p className='text-sm'>Upload several resume versions and click Build Master Resume. The AI merges them into one complete record of your experience.</p>
               </div>
             )}
 
@@ -348,6 +348,9 @@ export default function MasterResume() {
 
             {masterResume && (
               <div>
+                <p className='mb-3 rounded-lg bg-blue-50 px-3 py-2 text-sm text-blue-800'>
+                  Save or download it, then <a href='/' className='font-semibold underline'>tailor it to a job</a> to get a resume you can send.
+                </p>
                 <div className='mb-3 flex items-center justify-between'>
                   <h3 className='font-semibold text-slate-800'>Your Master Resume</h3>
                   <div className='flex gap-2'>
