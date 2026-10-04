@@ -92,6 +92,7 @@ export default function MasterResume() {
   const [role, setRole] = useState('candidate')
   const [isSaving, setIsSaving] = useState(false)
   const [saveMessage, setSaveMessage] = useState('')
+  const [savedContent, setSavedContent] = useState('') // what's stored in the account; the Save button is disabled while it matches
 
   const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
 
@@ -104,7 +105,7 @@ export default function MasterResume() {
       const response = await fetch(`${API_URL}/resume-library/master`, { headers: { Authorization: `Bearer ${data.session.access_token}` } })
       if (response.ok) {
         const saved = await response.json()
-        if (saved?.content) { setMasterResume(saved.content); setSaveMessage('Loaded your saved master resume.') }
+        if (saved?.content) { setMasterResume(saved.content); setSavedContent(saved.content); setSaveMessage('Loaded your saved master resume.') }
       }
     })
   }, [])
@@ -184,6 +185,7 @@ export default function MasterResume() {
         body: JSON.stringify({ content: masterResume }),
       })
       if (!response.ok) throw new Error('Unable to save your master resume.')
+      setSavedContent(masterResume)
       setSaveMessage('Master resume saved securely to your account.')
     } catch (saveError) { setSaveMessage(saveError instanceof Error ? saveError.message : 'Unable to save your master resume.') }
     setIsSaving(false)
@@ -349,9 +351,9 @@ export default function MasterResume() {
                 <div className='mb-3 flex items-center justify-between'>
                   <h3 className='font-semibold text-slate-800'>Your Master Resume</h3>
                   <div className='flex gap-2'>
-                    <button onClick={saveMasterResume} disabled={isSaving}
+                    <button onClick={saveMasterResume} disabled={isSaving || masterResume === savedContent}
                       className='rounded-lg border border-emerald-300 bg-emerald-50 px-3 py-1.5 text-xs font-medium text-emerald-700 hover:bg-emerald-100 disabled:opacity-50'>
-                      {isSaving ? 'Saving…' : 'Save to account'}
+                      {isSaving ? 'Saving…' : masterResume === savedContent ? 'Saved ✓' : 'Save to account'}
                     </button>
                     <button onClick={downloadDocx}
                       className='rounded-lg border border-blue-300 bg-blue-50 px-3 py-1.5 text-xs font-medium text-blue-700 hover:bg-blue-100'>

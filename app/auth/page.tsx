@@ -29,7 +29,7 @@ export default function AuthPage() {
     setIsLoading(false)
     setMessage(error
       ? { text: /rate limit|too many requests|seconds/i.test(error.message) ? 'Please wait a minute before requesting another confirmation email.' : error.message, type: 'error' }
-      : { text: `A new confirmation link was sent to ${unconfirmedEmail}. It is valid for 24 hours.`, type: 'success' })
+      : { text: `A new confirmation link was sent to ${unconfirmedEmail}. It is valid for 24 hours. If you don't see it, check your spam or junk folder.`, type: 'success' })
   }
 
   const handleSubmit = async () => {
@@ -84,7 +84,7 @@ export default function AuthPage() {
           window.location.replace(defaultDestinationForRole(undefined, accountType))
           return
         }
-        setMessage({ text: 'Account created! Please check your email to confirm your account, then log in.', type: 'success' })
+        setMessage({ text: 'Account created! Please check your email to confirm your account, then log in. No email after a few minutes? Check your spam or junk folder.', type: 'success' })
         setUnconfirmedEmail(email.trim())
         setMode('login')
       } else {
