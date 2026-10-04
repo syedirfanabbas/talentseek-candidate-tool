@@ -9,18 +9,18 @@ type RecruiterRequest = { id: string; target_role: string; notes?: string; statu
 
 const choices = [
   {
-    title: 'Build My Master Resume',
-    description: 'Bring your experience, skills, and achievements together in one comprehensive resume.',
-    action: 'Build my master resume',
-    href: '/master-resume',
-    category: 'Start with your experience',
-  },
-  {
     title: 'Tailor My Resume for a Job',
-    description: 'Have a role in mind? Match your resume to the job description and highlight the experience that matters.',
+    description: 'Start here. Upload your resume, paste the job description, and get a version tailored to that job, ready to send.',
     action: 'Optimize my resume',
     href: '/',
     category: 'Get ready to apply',
+  },
+  {
+    title: 'Build My Master Resume',
+    description: 'Optional. Have several old versions of your resume? Combine them into one complete record of your experience to tailor from. It is not the resume you send.',
+    action: 'Build my master resume',
+    href: '/master-resume',
+    category: 'Start with your experience',
   },
   {
     title: 'Get Recruiter Help',
