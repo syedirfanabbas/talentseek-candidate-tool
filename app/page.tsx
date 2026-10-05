@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { supabase } from '../lib/supabase'
 import { errorDetail, outOfCreditsMessage } from '../lib/credits'
 import { runAiJob } from '../lib/aiJobs'
@@ -113,12 +113,17 @@ export default function CandidateTool() {
     })()
   }, [])
 
+  // Role/Company are guessed from the job text (or the job page's data) until the user edits them;
+  // a new job description replaces guesses but never the user's own edits.
+  const [roleEdited, setRoleEdited] = useState(false)
+  const [companyEdited, setCompanyEdited] = useState(false)
+  const linkedJobText = useRef<string | null>(null) // job text whose Role/Company came from the job page itself
   useEffect(() => {
-    if (!jobDescription.trim()) return
+    if (!jobDescription.trim() || linkedJobText.current === jobDescription) return
     const guessed = parseJobInfo(jobDescription)
-    if (!role.trim() && guessed.title !== 'Role') setRole(guessed.title)
-    if (!company.trim() && guessed.company !== 'Company') setCompany(guessed.company)
-  }, [jobDescription, role, company])
+    if (!roleEdited) setRole(guessed.title !== 'Role' ? guessed.title : '')
+    if (!companyEdited) setCompany(guessed.company !== 'Company' ? guessed.company : '')
+  }, [jobDescription, roleEdited, companyEdited])
 
   const getAuthHeaders = async (): Promise<Record<string, string>> => {
     const { data } = await supabase.auth.getSession()
@@ -158,9 +163,10 @@ export default function CandidateTool() {
       })
       const data = await response.json()
       if (!response.ok || !data.text) throw new Error(data.error || 'We could not read that job page. Please paste the description instead.')
+      linkedJobText.current = data.job_title || data.company_name ? data.text : null
       setJobDescription(data.text)
-      if (!role.trim() && data.job_title) setRole(data.job_title)
-      if (!company.trim() && data.company_name) setCompany(data.company_name)
+      if (data.job_title) { setRole(data.job_title); setRoleEdited(false) }
+      if (data.company_name) { setCompany(data.company_name); setCompanyEdited(false) }
     } catch (fetchError) {
       setJobLinkError(fetchError instanceof Error ? fetchError.message : 'We could not read that job page. Please paste the description instead.')
     } finally { setIsFetchingJob(false) }
@@ -194,7 +200,7 @@ export default function CandidateTool() {
       setOptimizedLength(Number(resumeLength))
       setProfileImprovements(data.profile_improvements || '')
       // Save automatically: the user spent a credit on this result and may leave the page.
-      if (data.optimized_content && role.trim() && company.trim()) void saveOptimizedResume(data.optimized_content)
+      if (data.optimized_content) void saveOptimizedResume(data.optimized_content)
 
       setIsAnalyzing(true)
       try {
@@ -214,15 +220,11 @@ export default function CandidateTool() {
 
   const saveOptimizedResume = async (content: string = optimizedResume) => {
     if (!content.trim()) return
-    if (!role.trim() || !company.trim()) {
-      setOptimizedSaveMessage('Add the Role and Company before saving this resume.')
-      return
-    }
     setIsSavingOptimized(true); setOptimizedSaveMessage('')
     try {
       const response = await fetch(`${API_URL}/resume-library/optimized`, {
         method: 'POST', headers: { 'Content-Type': 'application/json', ...await getAuthHeaders() },
-        body: JSON.stringify({ title: `${role.trim()} – ${company.trim()}`, content, job_title: role.trim(), company_name: company.trim() }),
+        body: JSON.stringify({ title: [role.trim(), company.trim()].filter(Boolean).join(' – ') || `Tailored resume – ${new Date().toLocaleDateString()}`, content, job_title: role.trim() || null, company_name: company.trim() || null }),
       })
       if (!response.ok) throw new Error(withRetryAdvice('This resume was not saved to your account.'))
       setOptimizedSaved(true)
@@ -338,12 +340,12 @@ export default function CandidateTool() {
               className='min-h-[130px] w-full rounded-xl border border-slate-300 p-4 text-sm text-slate-900 outline-none focus:border-slate-500' />
 
             <div className='mt-5 grid gap-4 sm:grid-cols-2'>
-              <label className='text-sm font-medium text-slate-700'>Role <span className='text-slate-400'>(required to save)</span>
-                <input value={role} onChange={(e) => setRole(e.target.value)} placeholder='e.g. Product Manager'
+              <label className='text-sm font-medium text-slate-700'>Role <span className='text-slate-400'>(names your saved resume)</span>
+                <input value={role} onChange={(e) => { setRole(e.target.value); setRoleEdited(true) }} placeholder='e.g. Product Manager'
                   className='mt-1.5 w-full rounded-xl border border-slate-300 px-3 py-2.5 text-sm text-slate-900 outline-none focus:border-slate-500' />
               </label>
-              <label className='text-sm font-medium text-slate-700'>Company <span className='text-slate-400'>(required to save)</span>
-                <input value={company} onChange={(e) => setCompany(e.target.value)} placeholder='Company name'
+              <label className='text-sm font-medium text-slate-700'>Company <span className='text-slate-400'>(names your saved resume)</span>
+                <input value={company} onChange={(e) => { setCompany(e.target.value); setCompanyEdited(true) }} placeholder='Company name'
                   className='mt-1.5 w-full rounded-xl border border-slate-300 px-3 py-2.5 text-sm text-slate-900 outline-none focus:border-slate-500' />
               </label>
             </div>
@@ -395,7 +397,7 @@ export default function CandidateTool() {
                   <div className='mb-3 flex items-center justify-between'>
                     <h3 className='font-semibold text-slate-800'>Optimized Resume</h3>
                     <div className='flex gap-2'>
-                      <button onClick={() => void saveOptimizedResume()} disabled={isSavingOptimized || optimizedSaved || !role.trim() || !company.trim()}
+                      <button onClick={() => void saveOptimizedResume()} disabled={isSavingOptimized || optimizedSaved}
                         className='rounded-lg border border-emerald-300 bg-emerald-50 px-3 py-1.5 text-xs font-medium text-emerald-700 hover:bg-emerald-100 disabled:opacity-60'>
                         {isSavingOptimized ? 'Saving…' : optimizedSaved ? 'Saved ✓' : 'Save to account'}
                       </button>
