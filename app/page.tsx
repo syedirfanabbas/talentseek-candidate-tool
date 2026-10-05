@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { supabase } from '../lib/supabase'
 import { errorDetail, outOfCreditsMessage } from '../lib/credits'
 import { runAiJob } from '../lib/aiJobs'
@@ -21,21 +21,26 @@ function getInitials(name: string): string {
 
 function parseJobInfo(jd: string): { title: string; company: string } {
   const lines = jd.split('\n').map(l => l.trim()).filter(Boolean)
-  const title = lines[0]?.replace(/[^a-zA-Z\s]/g, '').trim().split(/\s+/).slice(0, 3).join(' ') || 'Role'
-  const companyLine = lines.find(l => /\bat\b|\bfor\b|\bwith\b/i.test(l))
-  const companyMatch = companyLine?.match(/(?:at|for|with)\s+([A-Z][a-zA-Z\s]+?)(?:\s*[,.]|$)/)?.[1]?.trim()
-  const company = companyMatch || lines[1]?.split(/\s+/).slice(0, 2).join('') || 'Company'
+  const useful = lines.filter(line => line.length <= 80 && !/(apply|save|back to jobs|\$|€|£|¥|currency)/i.test(line))
+  const atPattern = useful.map(line => line.match(/^(.{2,70}?)\s+at\s+(.{2,70}?)$/i)).find(Boolean)
+  const companyPattern = useful.map(line => line.match(/^company\s*:\s*(.{2,70})$/i)).find(Boolean)
+  const title = atPattern?.[1].trim() || useful.find(line => !/^company\s*:/i.test(line)) || 'Role'
+  const company = atPattern?.[2].trim() || companyPattern?.[1].trim() || 'Company'
   return { title, company }
 }
 
-function buildFilename(resumeText: string, jdText: string): string {
+function buildFilename(resumeText: string, jdText: string, role = '', company = ''): string {
   const nameMatch = resumeText.match(/^([A-Z][a-z]+(?:\s+[A-Z][a-z]+)+)/m)
   const name = nameMatch?.[1] || 'Resume'
   const initials = getInitials(name)
-  const { title, company } = parseJobInfo(jdText)
-  const titleAbbr = title.split(/\s+/).map(w => w[0]?.toUpperCase() || '').join('')
-  const companyClean = company.replace(/\s+/g, '')
+  const parsed = parseJobInfo(jdText)
+  const titleAbbr = (role || parsed.title).split(/\s+/).map(w => w[0]?.toUpperCase() || '').join('')
+  const companyClean = (company || parsed.company).replace(/\s+/g, '')
   return `${initials}-${titleAbbr}-${companyClean}`
+}
+
+function slugify(value: string): string {
+  return value.toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '') || 'role'
 }
 
 type AnalysisResult = {
@@ -60,6 +65,8 @@ export default function CandidateTool() {
   const [jobLink, setJobLink] = useState('')
   const [isFetchingJob, setIsFetchingJob] = useState(false)
   const [jobLinkError, setJobLinkError] = useState('')
+  const [role, setRole] = useState('')
+  const [company, setCompany] = useState('')
   const [optimizedResume, setOptimizedResume] = useState('')
   const [profileImprovements, setProfileImprovements] = useState('')
   const [analysis, setAnalysis] = useState<AnalysisResult | null>(null)
@@ -106,6 +113,18 @@ export default function CandidateTool() {
     })()
   }, [])
 
+  // Role/Company are guessed from the job text (or the job page's data) until the user edits them;
+  // a new job description replaces guesses but never the user's own edits.
+  const [roleEdited, setRoleEdited] = useState(false)
+  const [companyEdited, setCompanyEdited] = useState(false)
+  const linkedJobText = useRef<string | null>(null) // job text whose Role/Company came from the job page itself
+  useEffect(() => {
+    if (!jobDescription.trim() || linkedJobText.current === jobDescription) return
+    const guessed = parseJobInfo(jobDescription)
+    if (!roleEdited) setRole(guessed.title !== 'Role' ? guessed.title : '')
+    if (!companyEdited) setCompany(guessed.company !== 'Company' ? guessed.company : '')
+  }, [jobDescription, roleEdited, companyEdited])
+
   const getAuthHeaders = async (): Promise<Record<string, string>> => {
     const { data } = await supabase.auth.getSession()
     const token = data.session?.access_token
@@ -144,7 +163,10 @@ export default function CandidateTool() {
       })
       const data = await response.json()
       if (!response.ok || !data.text) throw new Error(data.error || 'We could not read that job page. Please paste the description instead.')
+      linkedJobText.current = data.job_title || data.company_name ? data.text : null
       setJobDescription(data.text)
+      if (data.job_title) { setRole(data.job_title); setRoleEdited(false) }
+      if (data.company_name) { setCompany(data.company_name); setCompanyEdited(false) }
     } catch (fetchError) {
       setJobLinkError(fetchError instanceof Error ? fetchError.message : 'We could not read that job page. Please paste the description instead.')
     } finally { setIsFetchingJob(false) }
@@ -199,11 +221,10 @@ export default function CandidateTool() {
   const saveOptimizedResume = async (content: string = optimizedResume) => {
     if (!content.trim()) return
     setIsSavingOptimized(true); setOptimizedSaveMessage('')
-    const { title, company } = parseJobInfo(jobDescription)
     try {
       const response = await fetch(`${API_URL}/resume-library/optimized`, {
         method: 'POST', headers: { 'Content-Type': 'application/json', ...await getAuthHeaders() },
-        body: JSON.stringify({ title: `Optimized resume — ${title}`, content, job_title: title, company_name: company }),
+        body: JSON.stringify({ title: [role.trim(), company.trim()].filter(Boolean).join(' – ') || `Tailored resume – ${new Date().toLocaleDateString()}`, content, job_title: role.trim() || null, company_name: company.trim() || null }),
       })
       if (!response.ok) throw new Error(withRetryAdvice('This resume was not saved to your account.'))
       setOptimizedSaved(true)
@@ -216,19 +237,16 @@ export default function CandidateTool() {
   const targetPages = () => (optimizedLength >= 3 ? null : optimizedLength)
 
   const downloadDocx = async () => {
-    await downloadResumeDocx(optimizedResume, buildFilename(optimizedResume, jobDescription), targetPages())
+    await downloadResumeDocx(optimizedResume, buildFilename(optimizedResume, jobDescription, role, company), targetPages())
   }
 
   const reportDate = () => new Date().toISOString().slice(0, 10)
 
-  const reportMeta = () => {
-    const { title, company } = parseJobInfo(jobDescription)
-    return { jobTitle: title === 'Role' ? undefined : title, company: company === 'Company' ? undefined : company }
-  }
+  const reportMeta = () => ({ jobTitle: role.trim() || undefined, company: company.trim() || undefined })
 
   const downloadProfileImprovements = async () => {
     if (!profileImprovements.trim()) return
-    await downloadProfileReport({ title: 'Profile improvement report', ...reportMeta() }, profileImprovements, `TalentSeek-profile-report-${reportDate()}.pdf`)
+    await downloadProfileReport({ title: 'Profile improvement report', ...reportMeta() }, profileImprovements, `TalentSeek-profile-report-${slugify(role)}-${slugify(company)}-${reportDate()}.pdf`)
   }
 
   const downloadAnalysisPdf = async () => {
@@ -247,12 +265,12 @@ export default function CandidateTool() {
         { title: 'Moderate matches', items: analysis.moderate_matches },
         { title: 'Gaps to address', items: analysis.gaps },
       ],
-      `TalentSeek-job-match-${reportDate()}.pdf`,
+      `TalentSeek-job-match-${slugify(role)}-${slugify(company)}-${reportDate()}.pdf`,
     )
   }
 
   const downloadPdf = () => {
-    downloadResumePdf(optimizedResume, buildFilename(optimizedResume, jobDescription), targetPages())
+    downloadResumePdf(optimizedResume, buildFilename(optimizedResume, jobDescription, role, company), targetPages())
   }
 
   const getMatchColor = (score: number) =>
@@ -320,6 +338,17 @@ export default function CandidateTool() {
             <textarea value={jobDescription} onChange={(e) => setJobDescription(e.target.value)}
               placeholder='Or paste the job description here...'
               className='min-h-[130px] w-full rounded-xl border border-slate-300 p-4 text-sm text-slate-900 outline-none focus:border-slate-500' />
+
+            <div className='mt-5 grid gap-4 sm:grid-cols-2'>
+              <label className='text-sm font-medium text-slate-700'>Role <span className='text-slate-400'>(names your saved resume)</span>
+                <input value={role} onChange={(e) => { setRole(e.target.value); setRoleEdited(true) }} placeholder='e.g. Product Manager'
+                  className='mt-1.5 w-full rounded-xl border border-slate-300 px-3 py-2.5 text-sm text-slate-900 outline-none focus:border-slate-500' />
+              </label>
+              <label className='text-sm font-medium text-slate-700'>Company <span className='text-slate-400'>(names your saved resume)</span>
+                <input value={company} onChange={(e) => { setCompany(e.target.value); setCompanyEdited(true) }} placeholder='Company name'
+                  className='mt-1.5 w-full rounded-xl border border-slate-300 px-3 py-2.5 text-sm text-slate-900 outline-none focus:border-slate-500' />
+              </label>
+            </div>
 
             <div className='mt-5'>
               <label className='mb-2 block text-sm font-medium text-slate-700'>Resume Length</label>
