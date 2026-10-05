@@ -15,7 +15,7 @@ type BillingSummary = {
 
 type RecruiterRequest = {
   id: string; target_role: string; service_type?: 'written_review' | 'recruiter_session' | null
-  intake_submitted_at?: string | null; intake?: Record<string, unknown> | null
+  intake_submitted_at?: string | null; intake?: Record<string, unknown> | null; status?: string
 }
 
 const goalOptions = [
@@ -169,7 +169,7 @@ export default function BillingPage() {
           </div>
         </section>
 
-        {recruiterRequests.filter(request => !request.intake_submitted_at).map(request => <RecruiterIntakeCard key={request.id} request={request} apiUrl={API_URL} onSubmitted={updated => setRecruiterRequests(items => items.map(item => item.id === updated.id ? updated : item))} />)}
+        {recruiterRequests.filter(request => !request.intake_submitted_at && ['submitted', 'in_review'].includes(request.status || '')).map(request => <RecruiterIntakeCard key={request.id} request={request} apiUrl={API_URL} onSubmitted={updated => setRecruiterRequests(items => items.map(item => item.id === updated.id ? updated : item))} />)}
 
         {recruiterRequests.some(request => request.service_type === 'recruiter_session' && request.intake_submitted_at) && (
           <section className='mt-10 rounded-2xl border border-teal-200 bg-teal-50 p-6 sm:p-7' aria-label='Book your recruiter session'>
