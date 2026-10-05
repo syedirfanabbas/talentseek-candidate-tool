@@ -9,6 +9,12 @@ import { AiProcessingNotice } from './components/AiProcessingNotice'
 import { downloadResumeDocx, downloadResumePdf } from '../lib/resumeLayout'
 import { downloadJobMatchReport, downloadProfileReport } from '../lib/reportPdf'
 
+const RETRY_ADVICE = 'Please try again, or try a different file.'
+
+function withRetryAdvice(message: string): string {
+  return message.includes(RETRY_ADVICE) ? message : `${message.trim().replace(/[.\s]+$/, '')}. ${RETRY_ADVICE}`
+}
+
 function getInitials(name: string): string {
   return name.trim().split(/\s+/).map(w => w[0]?.toUpperCase() || '').join('')
 }
@@ -51,6 +57,9 @@ type AnalysisResult = {
 export default function CandidateTool() {
   const [resume, setResume] = useState('')
   const [jobDescription, setJobDescription] = useState('')
+  const [jobLink, setJobLink] = useState('')
+  const [isFetchingJob, setIsFetchingJob] = useState(false)
+  const [jobLinkError, setJobLinkError] = useState('')
   const [optimizedResume, setOptimizedResume] = useState('')
   const [profileImprovements, setProfileImprovements] = useState('')
   const [analysis, setAnalysis] = useState<AnalysisResult | null>(null)
@@ -61,6 +70,8 @@ export default function CandidateTool() {
   const [uploadingResume, setUploadingResume] = useState(false)
   const [uploadingJD, setUploadingJD] = useState(false)
   const [resumeLength, setResumeLength] = useState('2')
+  const [savedResumes, setSavedResumes] = useState<{ key: string; label: string; content: string }[]>([])
+  const [resumeSource, setResumeSource] = useState('')
   // The length chosen for the result on screen (the buttons may change afterwards).
   const [optimizedLength, setOptimizedLength] = useState(2)
   const [isSavingOptimized, setIsSavingOptimized] = useState(false)
@@ -77,6 +88,22 @@ export default function CandidateTool() {
       setJobDescription(storedJobDescription)
       sessionStorage.removeItem('talentseek-job-description')
     }
+    // Saved master and optimized resumes for the "Use a saved resume" picker (same as interview prep).
+    void (async () => {
+      try {
+        const headers = await getAuthHeaders()
+        const [masterResponse, optimizedResponse] = await Promise.all([
+          fetch(`${API_URL}/resume-library/master`, { headers }),
+          fetch(`${API_URL}/resume-library/optimized`, { headers }),
+        ])
+        const master = masterResponse.ok ? await masterResponse.json() : null
+        const optimized: { id: string; title: string; content: string }[] = optimizedResponse.ok ? await optimizedResponse.json() : []
+        setSavedResumes([
+          ...(master?.content ? [{ key: 'master', label: 'Master resume', content: master.content }] : []),
+          ...optimized.map(item => ({ key: item.id, label: item.title, content: item.content })),
+        ])
+      } catch { /* the picker simply stays hidden */ }
+    })()
   }, [])
 
   const getAuthHeaders = async (): Promise<Record<string, string>> => {
@@ -101,13 +128,30 @@ export default function CandidateTool() {
       })
       if (!res.ok) throw new Error('Failed to parse file')
       const data = await res.json()
-      if (data.text) { setter(data.text) } else { setError(data.error || 'Could not extract text') }
-    } catch (err) { setError(err instanceof Error ? err.message : 'Upload failed') }
+      if (data.text) { setter(data.text) } else { setError(withRetryAdvice(data.error || 'Could not extract text')) }
+    } catch (err) { setError(withRetryAdvice(err instanceof Error ? err.message : 'Upload failed')) }
     finally { setUploading(false) }
   }
 
+  const fetchJobText = async () => {
+    if (!jobLink.trim()) { setJobLinkError('Paste a job link first.'); return }
+    setIsFetchingJob(true); setJobLinkError(''); setError('')
+    try {
+      const response = await fetch(`${API_URL}/resumes/fetch-job`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...await getAuthHeaders() },
+        body: JSON.stringify({ url: jobLink.trim() }),
+      })
+      const data = await response.json()
+      if (!response.ok || !data.text) throw new Error(data.error || 'We could not read that job page. Please paste the description instead.')
+      setJobDescription(data.text)
+    } catch (fetchError) {
+      setJobLinkError(fetchError instanceof Error ? fetchError.message : 'We could not read that job page. Please paste the description instead.')
+    } finally { setIsFetchingJob(false) }
+  }
+
   const handleResumeFile = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]; if (file) parseFile(file, setResume, setUploadingResume)
+    const file = e.target.files?.[0]; if (file) { setResumeSource(''); parseFile(file, setResume, setUploadingResume) }
   }
   const handleJDFile = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]; if (file) parseFile(file, setJobDescription, setUploadingJD)
@@ -126,7 +170,7 @@ export default function CandidateTool() {
       )
       if (!outcome.ok) {
         const creditMessage = outOfCreditsMessage(outcome.status, outcome.body)
-        if (creditMessage) { setNeedsCredits(true); throw new Error(creditMessage) }
+        if (creditMessage) { setNeedsCredits(true); throw Object.assign(new Error(creditMessage), { noRetryAdvice: true }) }
         throw new Error(errorDetail(outcome.body, 'Optimization failed'))
       }
       const data = outcome.result
@@ -148,7 +192,7 @@ export default function CandidateTool() {
       } catch (_) {}
       finally { setIsAnalyzing(false) }
 
-    } catch (err) { setError(err instanceof Error ? err.message : 'Something went wrong') }
+    } catch (err) { setError(err instanceof Error && (err as Error & { noRetryAdvice?: boolean }).noRetryAdvice ? err.message : withRetryAdvice(err instanceof Error ? err.message : 'Something went wrong')) }
     finally { setIsLoading(false) }
   }
 
@@ -161,10 +205,10 @@ export default function CandidateTool() {
         method: 'POST', headers: { 'Content-Type': 'application/json', ...await getAuthHeaders() },
         body: JSON.stringify({ title: `Optimized resume — ${title}`, content, job_title: title, company_name: company }),
       })
-      if (!response.ok) throw new Error('This resume was not saved to your account. Please try again or download it.')
+      if (!response.ok) throw new Error(withRetryAdvice('This resume was not saved to your account.'))
       setOptimizedSaved(true)
       setOptimizedSaveMessage('Saved to My Resumes. You can open it any time from your dashboard.')
-    } catch (saveError) { setOptimizedSaveMessage(saveError instanceof Error ? saveError.message : 'This resume was not saved to your account. Please try again or download it.') }
+    } catch (saveError) { setOptimizedSaveMessage(withRetryAdvice(saveError instanceof Error ? saveError.message : 'This resume was not saved to your account.')) }
     setIsSavingOptimized(false)
   }
 
@@ -238,17 +282,37 @@ export default function CandidateTool() {
 
         <div className='grid gap-8 lg:grid-cols-2'>
           <section className='rounded-2xl bg-white p-6 shadow-sm'>
-            <h2 className='mb-3 text-xl font-semibold text-slate-900'>Your Resume</h2>
+            <div className='mb-3 flex flex-wrap items-center justify-between gap-2'>
+              <h2 className='text-xl font-semibold text-slate-900'>Your Resume</h2>
+              {savedResumes.length > 0 && (
+                <select value='' aria-label='Use a saved resume'
+                  onChange={(e) => { const saved = savedResumes.find(item => item.key === e.target.value); if (saved) { setResume(saved.content); setResumeSource(saved.label) } }}
+                  className='rounded-lg border border-slate-300 bg-white px-2 py-1.5 text-xs font-semibold text-slate-700'>
+                  <option value=''>Use a saved resume…</option>
+                  {savedResumes.map(item => <option key={item.key} value={item.key}>{item.label}</option>)}
+                </select>
+              )}
+            </div>
             <label className='mb-3 flex cursor-pointer items-center gap-2 rounded-xl border border-dashed border-slate-300 px-4 py-3 text-sm text-slate-600 hover:border-slate-400'>
               <input type='file' accept='.pdf,.docx' className='hidden' onChange={handleResumeFile} disabled={uploadingResume} />
               {uploadingResume ? 'Extracting...' : '📎 Upload PDF or Word'}
             </label>
-            <textarea value={resume} onChange={(e) => setResume(e.target.value)}
-              placeholder='Or paste your resume here...'
+            {resumeSource && resume && <p className='mb-2 text-xs text-teal-700'>Using: {resumeSource}</p>}
+            <textarea value={resume} onChange={(e) => { setResume(e.target.value); if (!e.target.value) setResumeSource('') }}
+              placeholder='Or paste your resume here, or choose a saved resume above...'
               className='min-h-[160px] w-full rounded-xl border border-slate-300 p-4 text-sm text-slate-900 outline-none focus:border-slate-500' />
             <AiProcessingNotice />
 
             <h2 className='mb-3 mt-5 text-xl font-semibold text-slate-900'>Job Description</h2>
+            <div className='mb-3 flex flex-col gap-2 sm:flex-row'>
+              <input value={jobLink} onChange={(e) => setJobLink(e.target.value)} type='url' placeholder='Paste a job link' aria-label='Job link'
+                className='min-w-0 flex-1 rounded-xl border border-slate-300 px-4 py-3 text-sm text-slate-900 outline-none focus:border-slate-500' />
+              <button type='button' onClick={() => void fetchJobText()} disabled={isFetchingJob}
+                className='rounded-xl bg-slate-900 px-4 py-3 text-sm font-medium text-white disabled:opacity-50'>
+                {isFetchingJob ? 'Getting text…' : 'Get job text'}
+              </button>
+            </div>
+            {jobLinkError && <p className='mb-3 text-sm text-red-700'>{jobLinkError}</p>}
             <label className='mb-3 flex cursor-pointer items-center gap-2 rounded-xl border border-dashed border-slate-300 px-4 py-3 text-sm text-slate-600 hover:border-slate-400'>
               <input type='file' accept='.pdf,.docx' className='hidden' onChange={handleJDFile} disabled={uploadingJD} />
               {uploadingJD ? 'Extracting...' : '📎 Upload PDF or Word'}
@@ -318,7 +382,7 @@ export default function CandidateTool() {
                       </button>
                     </div>
                   </div>
-                  {optimizedSaveMessage && <p className='mb-3 text-xs text-slate-500'>{optimizedSaveMessage}{optimizedSaved && <> <a href='/my-resumes' className='font-semibold text-slate-700 underline'>Open My Resumes</a></>}</p>}
+                  {optimizedSaveMessage && <p className={`mb-3 rounded-xl p-3 text-sm ${optimizedSaved ? 'bg-emerald-50 text-emerald-800' : 'bg-amber-50 text-amber-800'}`}>{optimizedSaved && '✓ '}{optimizedSaveMessage}{optimizedSaved && <> <a href='/my-resumes' className='font-semibold underline'>Open My Resumes</a></>}</p>}
                   <pre className='max-h-56 overflow-y-auto whitespace-pre-wrap rounded-xl bg-slate-100 p-4 text-sm text-slate-800'>{optimizedResume}</pre>
                 </div>
 

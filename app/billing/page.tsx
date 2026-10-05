@@ -29,6 +29,7 @@ export default function BillingPage() {
   const [notice, setNotice] = useState('')
   const [checkingOut, setCheckingOut] = useState<string | null>(null)
   const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
+  const creditClass = (credits: number | null | undefined) => summary?.unlimited || (credits ?? 0) > 0 ? 'text-emerald-700' : summary ? 'text-red-700' : 'text-slate-900'
 
   useEffect(() => {
     const checkoutResult = new URLSearchParams(window.location.search).get('checkout')
@@ -79,9 +80,9 @@ export default function BillingPage() {
         {error && <p role='alert' className='mt-6 rounded-xl bg-red-50 p-4 text-red-800'>{error}</p>}
         {notice && <p role='status' className='mt-6 rounded-xl bg-teal-50 p-4 text-teal-900'>{notice}</p>}
         <section className='mt-8 grid gap-4 sm:grid-cols-3' aria-label='Current usage'>
-          <div className='rounded-2xl border border-slate-200 bg-white p-6 shadow-sm'><p className='text-sm text-slate-500'>Current plan</p><p className='mt-2 text-2xl font-bold capitalize text-slate-900'>{summary?.unlimited ? 'Founding member' : summary?.entitlement.plan_key || 'Free'}</p></div>
-          <div className='rounded-2xl border border-slate-200 bg-white p-6 shadow-sm'><p className='text-sm text-slate-500'>Resume optimizations remaining</p><p className='mt-2 text-3xl font-bold text-slate-900'>{summary ? (summary.unlimited ? 'Unlimited' : summary.available.resume_optimizations) : '—'}</p></div>
-          <div className='rounded-2xl border border-slate-200 bg-white p-6 shadow-sm'><p className='text-sm text-slate-500'>Interview packs remaining</p><p className='mt-2 text-3xl font-bold text-slate-900'>{summary ? (summary.unlimited ? 'Unlimited' : summary.available.interview_prep_packs) : '—'}</p></div>
+          <div className='rounded-2xl border border-slate-200 bg-white p-6 shadow-sm'><p className='text-sm text-slate-500'>Current plan</p><p className={`mt-2 text-2xl font-bold capitalize ${summary?.unlimited ? 'text-emerald-700' : 'text-slate-900'}`}>{summary?.unlimited ? 'Founding member' : summary?.entitlement.plan_key || 'Free'}</p></div>
+          <div className='rounded-2xl border border-slate-200 bg-white p-6 shadow-sm'><p className='text-sm text-slate-500'>Resume optimizations remaining</p><p className={`mt-2 text-3xl font-bold ${creditClass(summary?.available.resume_optimizations)}`}>{summary ? (summary.unlimited ? 'Unlimited' : summary.available.resume_optimizations) : '—'}</p></div>
+          <div className='rounded-2xl border border-slate-200 bg-white p-6 shadow-sm'><p className='text-sm text-slate-500'>Interview packs remaining</p><p className={`mt-2 text-3xl font-bold ${creditClass(summary?.available.interview_prep_packs)}`}>{summary ? (summary.unlimited ? 'Unlimited' : summary.available.interview_prep_packs) : '—'}</p></div>
         </section>
 
         <section className='mt-12'>

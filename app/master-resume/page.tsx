@@ -349,7 +349,7 @@ export default function MasterResume() {
             {masterResume && (
               <div>
                 <p className='mb-3 rounded-lg bg-blue-50 px-3 py-2 text-sm text-blue-800'>
-                  Save or download it, then <a href='/' className='font-semibold underline'>tailor it to a job</a> to get a resume you can send.
+                  Save it to your account, then <a href='/' className='font-semibold underline'>tailor it to a job</a> (choose &quot;Master resume&quot; under &quot;Use a saved resume&quot;) to get a resume you can send.
                 </p>
                 <div className='mb-3 flex items-center justify-between'>
                   <h3 className='font-semibold text-slate-800'>Your Master Resume</h3>
