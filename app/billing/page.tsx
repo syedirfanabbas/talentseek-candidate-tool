@@ -113,6 +113,15 @@ export default function BillingPage() {
   const [recruiterRequests, setRecruiterRequests] = useState<RecruiterRequest[]>([])
   const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
   const creditClass = (credits: number | null | undefined) => summary?.unlimited || (credits ?? 0) > 0 ? 'text-emerald-700' : summary ? 'text-red-700' : 'text-slate-900'
+  const hasReadySession = recruiterRequests.some(request => request.service_type === 'recruiter_session' && request.intake_submitted_at)
+  const hasPendingSession = recruiterRequests.some(request => request.service_type === 'recruiter_session' && !request.intake_submitted_at)
+  const hasReadyReview = recruiterRequests.some(request => request.service_type === 'written_review' && request.intake_submitted_at)
+
+  const intakeSubmitted = (updated: RecruiterRequest) => {
+    setRecruiterRequests(items => items.map(item => item.id === updated.id ? updated : item))
+    setNotice('Thanks, your recruiter will review this before your session.')
+    window.requestAnimationFrame(() => document.getElementById('recruiter-next-step')?.scrollIntoView({ behavior: 'smooth', block: 'start' }))
+  }
 
   useEffect(() => {
     const checkoutResult = new URLSearchParams(window.location.search).get('checkout')
@@ -163,6 +172,12 @@ export default function BillingPage() {
         <h1 className='mt-3 text-3xl font-bold tracking-tight text-slate-900 sm:text-5xl'>Choose support for your job search.</h1>
         <p className='mt-4 max-w-3xl text-lg leading-8 text-slate-600'>Start free, buy a small pack when you need it, or book time with a recruiter. No subscription.</p>
 
+        {(hasReadySession || hasReadyReview || hasPendingSession) && <section id='recruiter-next-step' className='mt-6 scroll-mt-6'>
+          {hasReadySession && <div className='rounded-2xl border border-teal-200 bg-teal-50 p-6 sm:p-7' aria-label='Book your recruiter session'><h2 className='text-xl font-bold text-slate-900'>Book your 30-minute session</h2><p className='mt-2 max-w-3xl leading-7 text-slate-700'>Choose a time that suits you. Please book with the same email address you used for your purchase, so we can match your booking to your order. A Google Meet link is included in your confirmation.</p><p className='mt-2 text-sm text-slate-700'>One session per purchase. To reschedule or cancel, use the link in your Google confirmation email.</p><div className='mt-4 flex flex-wrap gap-3'>{SESSION_BOOKING_PAGES.map(page => <a key={page.url} href={page.url} target='_blank' rel='noopener noreferrer' className='rounded-xl bg-slate-900 px-5 py-3 text-sm font-semibold text-white hover:bg-slate-700'>{page.label}</a>)}</div></div>}
+          {hasPendingSession && <div className='rounded-2xl border border-slate-200 bg-white p-6'><h2 className='text-xl font-bold text-slate-900'>Session booking</h2><p className='mt-2 text-slate-700'>Complete your intake first, then choose a time (at least 48 hours ahead, so your recruiter can prepare).</p></div>}
+          {hasReadyReview && <p className='mt-4 rounded-xl bg-teal-50 p-4 text-sm text-teal-900'>Delivered within 5 business days after your intake.</p>}
+        </section>}
+
         {error && <p role='alert' className='mt-6 rounded-xl bg-red-50 p-4 text-red-800'>{error}</p>}
         {notice && <p role='status' className='mt-6 rounded-xl bg-teal-50 p-4 text-teal-900'>{notice}</p>}
         <section className='mt-8 grid gap-4 sm:grid-cols-3' aria-label='Current usage'>
@@ -178,18 +193,7 @@ export default function BillingPage() {
           </div>
         </section>
 
-        {recruiterRequests.filter(request => !request.intake_submitted_at && ['submitted', 'in_review'].includes(request.status || '')).map(request => <RecruiterIntakeCard key={request.id} request={request} apiUrl={API_URL} onSubmitted={updated => setRecruiterRequests(items => items.map(item => item.id === updated.id ? updated : item))} />)}
-
-        {recruiterRequests.some(request => request.service_type === 'recruiter_session' && request.intake_submitted_at) && (
-          <section className='mt-10 rounded-2xl border border-teal-200 bg-teal-50 p-6 sm:p-7' aria-label='Book your recruiter session'>
-            <h2 className='text-xl font-bold text-slate-900'>Book your 30-minute session</h2>
-            <p className='mt-2 max-w-3xl leading-7 text-slate-700'>Choose a time that suits you. Please book with the same email address you used for your purchase, so we can match your booking to your order. A Google Meet link is included in your confirmation.</p>
-            <div className='mt-4 flex flex-wrap gap-3'>{SESSION_BOOKING_PAGES.map(page => <a key={page.url} href={page.url} target='_blank' rel='noopener noreferrer' className='rounded-xl bg-slate-900 px-5 py-3 text-sm font-semibold text-white hover:bg-slate-700'>{page.label}</a>)}</div>
-          </section>
-        )}
-
-        {recruiterRequests.some(request => request.service_type === 'recruiter_session' && !request.intake_submitted_at) && <section className='mt-8 rounded-2xl border border-slate-200 bg-white p-6'><h2 className='text-xl font-bold text-slate-900'>Session booking</h2><p className='mt-2 text-slate-700'>Complete your intake first, then choose a time (at least 48 hours ahead, so your recruiter can prepare).</p></section>}
-        {recruiterRequests.some(request => request.service_type === 'written_review' && request.intake_submitted_at) && <p className='mt-6 rounded-xl bg-teal-50 p-4 text-sm text-teal-900'>Delivered within 5 business days after your intake.</p>}
+        {recruiterRequests.filter(request => !request.intake_submitted_at && ['submitted', 'in_review'].includes(request.status || '')).map(request => <RecruiterIntakeCard key={request.id} request={request} apiUrl={API_URL} onSubmitted={intakeSubmitted} />)}
 
         <section id='recruiter-support' className='mt-10 scroll-mt-24 rounded-2xl bg-slate-900 p-7 text-white sm:p-9'>
           <p className='text-sm font-semibold uppercase tracking-widest text-teal-300'>Human support</p>
