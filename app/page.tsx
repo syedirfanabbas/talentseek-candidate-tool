@@ -6,9 +6,8 @@ import { errorDetail, outOfCreditsMessage } from '../lib/credits'
 import { runAiJob } from '../lib/aiJobs'
 import { LoadingSpinner } from './components/LoadingSpinner'
 import { AiProcessingNotice } from './components/AiProcessingNotice'
-import { Document, Packer, Paragraph, TextRun } from 'docx'
-import { saveAs } from 'file-saver'
 import { downloadResumeDocx, downloadResumePdf } from '../lib/resumeLayout'
+import { downloadJobMatchReport, downloadProfileReport } from '../lib/reportPdf'
 
 function getInitials(name: string): string {
   return name.trim().split(/\s+/).map(w => w[0]?.toUpperCase() || '').join('')
@@ -176,53 +175,35 @@ export default function CandidateTool() {
     await downloadResumeDocx(optimizedResume, buildFilename(optimizedResume, jobDescription), targetPages())
   }
 
+  const reportDate = () => new Date().toISOString().slice(0, 10)
+
+  const reportMeta = () => {
+    const { title, company } = parseJobInfo(jobDescription)
+    return { jobTitle: title === 'Role' ? undefined : title, company: company === 'Company' ? undefined : company }
+  }
+
   const downloadProfileImprovements = async () => {
     if (!profileImprovements.trim()) return
+    await downloadProfileReport({ title: 'Profile improvement report', ...reportMeta() }, profileImprovements, `TalentSeek-profile-report-${reportDate()}.pdf`)
+  }
 
-    const lines = profileImprovements.split('\n')
-
-    const doc = new Document({
-      sections: [{
-        properties: {
-          page: {
-            margin: { top: 720, bottom: 720, left: 1080, right: 1080 }
-          }
-        },
-        children: [
-          new Paragraph({
-            children: [
-              new TextRun({
-                text: 'PROFILE IMPROVEMENT REPORT',
-                bold: true,
-                size: 28,
-                font: 'Calibri',
-              })
-            ],
-            spacing: { after: 240 },
-          }),
-          ...lines.map(line =>
-            new Paragraph({
-              children: [
-                new TextRun({
-                  text: line,
-                  bold:
-                    line.trim() === 'MANDATORY INFORMATION / GAPS' ||
-                    line.trim() === 'OPTIONAL PROFILE IMPROVEMENTS',
-                  size: 20,
-                  font: 'Calibri',
-                })
-              ],
-              spacing: { after: 100 },
-            })
-          ),
-        ],
-      }],
-    })
-
-    const filename = buildFilename(optimizedResume, jobDescription)
-    saveAs(
-      await Packer.toBlob(doc),
-      `${filename}-profile-improvements.docx`
+  const downloadAnalysisPdf = async () => {
+    if (!analysis || analysis.error) return
+    await downloadJobMatchReport(
+      { title: 'Job match analysis', ...reportMeta() },
+      analysis.match_rate,
+      [
+        { label: 'Industry', score: analysis.industry_score },
+        { label: 'Experience', score: analysis.experience_score },
+        { label: 'Skills', score: analysis.skills_score },
+        { label: 'Competencies', score: analysis.competency_score },
+      ],
+      [
+        { title: 'Strong matches', items: analysis.strong_matches },
+        { title: 'Moderate matches', items: analysis.moderate_matches },
+        { title: 'Gaps to address', items: analysis.gaps },
+      ],
+      `TalentSeek-job-match-${reportDate()}.pdf`,
     )
   }
 
@@ -354,7 +335,7 @@ export default function CandidateTool() {
                         onClick={downloadProfileImprovements}
                         className='shrink-0 rounded-lg border border-amber-300 bg-white px-3 py-1.5 text-xs font-medium text-amber-800 hover:bg-amber-100'
                       >
-                        📥 Download Report
+                        📥 Download Report (PDF)
                       </button>
                     </div>
                     <pre className='max-h-56 overflow-y-auto whitespace-pre-wrap text-sm text-amber-900'>
@@ -372,7 +353,7 @@ export default function CandidateTool() {
 
                 {analysis && !analysis.error && (
                   <div className='space-y-3'>
-                    <h3 className='font-semibold text-slate-800'>Job Match Analysis</h3>
+                    <div className='flex flex-wrap items-center justify-between gap-3'><h3 className='font-semibold text-slate-800'>Job Match Analysis</h3><button type='button' onClick={() => void downloadAnalysisPdf()} className='rounded-lg border border-red-300 bg-red-50 px-3 py-1.5 text-xs font-medium text-red-700 hover:bg-red-100'>📥 Download analysis (PDF)</button></div>
 
                     <div className={`rounded-xl border p-4 ${getMatchColor(analysis.match_rate)}`}>
                       <div className='flex items-start justify-between'>
