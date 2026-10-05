@@ -50,7 +50,7 @@ function RecruiterIntakeCard({ request, apiUrl, onSubmitted }: { request: Recrui
     const response = await fetch(`${apiUrl}/resumes/fetch-job`, { method: 'POST', headers: { 'Content-Type': 'application/json', ...await authHeaders() }, body: JSON.stringify({ url: jobLinks[index] }) })
     const data = await response.json()
     if (!response.ok || !data.text) { setMessage(data.error || 'Unable to read that job link.'); return }
-    updateAd(index, data.text)
+    updateAd(index, String(data.text).slice(0, 20000))
   }
   const parseResume = async (file: File) => {
     const data = new FormData(); data.append('file', file)
@@ -64,7 +64,16 @@ function RecruiterIntakeCard({ request, apiUrl, onSubmitted }: { request: Recrui
     try {
       const response = await fetch(`${apiUrl}/recruiter-requests/${request.id}/intake`, { method: 'PUT', headers: { 'Content-Type': 'application/json', ...await authHeaders() }, body: JSON.stringify({ goal, ...form, job_ads: jobAds.filter(Boolean), resume_text: resume, resume_label: resumeLabel }) })
       const data = await response.json()
-      if (!response.ok) throw new Error(data.detail || 'Unable to submit your intake.')
+      if (!response.ok) {
+        // FastAPI validation errors arrive as a list: [{loc: [..., field], msg}]
+        const detail = Array.isArray(data.detail)
+          ? data.detail.map((item: { loc?: unknown[]; msg?: string }) => {
+              const field = String(item.loc?.[item.loc.length - 1] ?? '').replace(/_/g, ' ')
+              return `${field ? field.charAt(0).toUpperCase() + field.slice(1) + ': ' : ''}${(item.msg || '').replace(/^Value error, /, '')}`
+            }).join(' · ')
+          : data.detail
+        throw new Error(detail || 'Unable to submit your intake.')
+      }
       onSubmitted(data); setMessage('Thanks, your recruiter will review this before your session.')
     } catch (error) { setMessage(error instanceof Error ? error.message : 'Unable to submit your intake.') } finally { setSaving(false) }
   }
@@ -79,7 +88,7 @@ function RecruiterIntakeCard({ request, apiUrl, onSubmitted }: { request: Recrui
     <fieldset className='mt-5'><legend className='text-sm font-semibold text-slate-700'>Goal</legend><div className='mt-2 grid gap-2 sm:grid-cols-2'>{goalOptions.map(([value, label]) => <label key={value} className='flex items-center gap-2 text-sm text-slate-700'><input type='radio' checked={goal === value} onChange={() => setGoal(value)} /> {label}</label>)}</div></fieldset>
     <label className='mt-4 block text-sm font-medium text-slate-700'>Tell us more<textarea value={form.goal_details} onChange={event => setForm({ ...form, goal_details: event.target.value })} maxLength={1000} className='mt-1.5 min-h-20 w-full rounded-xl border border-slate-300 p-3 text-slate-900' /></label>
     <div className='mt-4 grid gap-4 md:grid-cols-3'>{[['target_country', 'Target country'], ['target_industry', 'Target industry'], ['current_role', 'Current role']].map(([key, label]) => <label key={key} className='text-sm font-medium text-slate-700'>{label}<input value={form[key as keyof typeof form]} onChange={event => setForm({ ...form, [key]: event.target.value })} className='mt-1.5 w-full rounded-xl border border-slate-300 px-3 py-2 text-slate-900' /></label>)}</div>
-    <div className='mt-5'><p className='text-sm font-semibold text-slate-700'>Job ads <span className='font-normal'>(up to 3)</span></p>{jobAds.map((ad, index) => <div key={index} className='mt-3 rounded-xl border border-slate-200 bg-white p-3'><div className='flex gap-2'><input value={jobLinks[index] || ''} onChange={event => setJobLinks(items => items.map((item, i) => i === index ? event.target.value : item))} placeholder='Paste a job link' className='min-w-0 flex-1 rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900' /><button type='button' onClick={() => void fetchJob(index)} className='rounded-lg border border-slate-300 px-3 text-sm font-medium text-slate-700'>Get text</button></div><textarea value={ad} onChange={event => updateAd(index, event.target.value)} maxLength={8000} placeholder='Or paste the job ad text' className='mt-2 min-h-24 w-full rounded-lg border border-slate-300 p-3 text-sm text-slate-900' /></div>)}{jobAds.length < 3 && <button type='button' onClick={() => { setJobAds([...jobAds, '']); setJobLinks([...jobLinks, '']) }} className='mt-3 text-sm font-semibold text-teal-800 underline'>Add another job ad</button>}</div>
+    <div className='mt-5'><p className='text-sm font-semibold text-slate-700'>Job ads <span className='font-normal'>(up to 3)</span></p>{jobAds.map((ad, index) => <div key={index} className='mt-3 rounded-xl border border-slate-200 bg-white p-3'><div className='flex gap-2'><input value={jobLinks[index] || ''} onChange={event => setJobLinks(items => items.map((item, i) => i === index ? event.target.value : item))} placeholder='Paste a job link' className='min-w-0 flex-1 rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900' /><button type='button' onClick={() => void fetchJob(index)} className='rounded-lg border border-slate-300 px-3 text-sm font-medium text-slate-700'>Get text</button></div><textarea value={ad} onChange={event => updateAd(index, event.target.value)} maxLength={20000} placeholder='Or paste the job ad text' className='mt-2 min-h-24 w-full rounded-lg border border-slate-300 p-3 text-sm text-slate-900' /></div>)}{jobAds.length < 3 && <button type='button' onClick={() => { setJobAds([...jobAds, '']); setJobLinks([...jobLinks, '']) }} className='mt-3 text-sm font-semibold text-teal-800 underline'>Add another job ad</button>}</div>
     <div className='mt-4 grid gap-4 md:grid-cols-2'><label className='text-sm font-medium text-slate-700'>Biggest concern<textarea value={form.biggest_concern} onChange={event => setForm({ ...form, biggest_concern: event.target.value })} maxLength={2000} className='mt-1.5 min-h-24 w-full rounded-xl border border-slate-300 p-3 text-slate-900' /></label><label className='text-sm font-medium text-slate-700'>Achievements to highlight<textarea value={form.achievements} onChange={event => setForm({ ...form, achievements: event.target.value })} maxLength={3000} className='mt-1.5 min-h-24 w-full rounded-xl border border-slate-300 p-3 text-slate-900' /></label></div>
     <label className='mt-4 block text-sm font-medium text-slate-700'>LinkedIn URL <span className='font-normal text-slate-500'>(optional)</span><input value={form.linkedin_url} onChange={event => setForm({ ...form, linkedin_url: event.target.value })} placeholder='https://www.linkedin.com/in/your-name' className='mt-1.5 w-full rounded-xl border border-slate-300 px-3 py-2 text-slate-900' /></label>
     <button type='button' onClick={() => void submit()} disabled={saving} className='mt-6 rounded-xl bg-slate-900 px-5 py-3 text-sm font-semibold text-white disabled:opacity-50'>{saving ? 'Submitting…' : 'Submit intake'}</button>{message && <p role='status' className='mt-3 text-sm text-teal-900'>{message}</p>}
