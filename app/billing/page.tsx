@@ -16,6 +16,7 @@ type BillingSummary = {
 type RecruiterRequest = {
   id: string; target_role: string; service_type?: 'written_review' | 'recruiter_session' | null
   intake_submitted_at?: string | null; intake?: Record<string, unknown> | null; status?: string
+  booking?: { starts_at: string; ends_at?: string | null; team: string; meet_url?: string | null } | null
 }
 
 const goalOptions = [
@@ -111,11 +112,17 @@ export default function BillingPage() {
   const [notice, setNotice] = useState('')
   const [checkingOut, setCheckingOut] = useState<string | null>(null)
   const [recruiterRequests, setRecruiterRequests] = useState<RecruiterRequest[]>([])
+  const [accountEmail, setAccountEmail] = useState('')
+  const [refreshingBooking, setRefreshingBooking] = useState(false)
+  const [bookingRefreshMessage, setBookingRefreshMessage] = useState('')
   const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
   const creditClass = (credits: number | null | undefined) => summary?.unlimited || (credits ?? 0) > 0 ? 'text-emerald-700' : summary ? 'text-red-700' : 'text-slate-900'
-  const hasReadySession = recruiterRequests.some(request => request.service_type === 'recruiter_session' && request.intake_submitted_at)
-  const hasPendingSession = recruiterRequests.some(request => request.service_type === 'recruiter_session' && !request.intake_submitted_at)
-  const hasReadyReview = recruiterRequests.some(request => request.service_type === 'written_review' && request.intake_submitted_at)
+  const sessionRequests = recruiterRequests.filter(request => request.service_type === 'recruiter_session' && ['submitted', 'in_review'].includes(request.status || ''))
+  const bookableSessions = sessionRequests.filter(request => request.intake_submitted_at && !request.booking)
+  const bookedSessions = sessionRequests.filter(request => request.booking)
+  const hasReadySession = bookableSessions.length > 0
+  const hasPendingSession = sessionRequests.some(request => !request.intake_submitted_at)
+  const hasReadyReview = recruiterRequests.some(request => request.service_type === 'written_review' && request.intake_submitted_at && ['submitted', 'in_review'].includes(request.status || ''))
 
   const intakeSubmitted = (updated: RecruiterRequest) => {
     setRecruiterRequests(items => items.map(item => item.id === updated.id ? updated : item))
@@ -130,6 +137,7 @@ export default function BillingPage() {
     void (async () => {
       const { data } = await supabase.auth.getSession()
       if (!data.session) return
+      setAccountEmail(data.session.user.email || '')
       const headers = { Authorization: `Bearer ${data.session.access_token}` }
       const response = await fetch(`${API_URL}/billing/me`, { headers })
       if (!response.ok) { setError('Unable to load your plan and usage.'); return }
@@ -138,6 +146,19 @@ export default function BillingPage() {
       if (requests.ok) setRecruiterRequests(await requests.json())
     })()
   }, [API_URL])
+
+  const refreshBookings = async () => {
+    setRefreshingBooking(true); setBookingRefreshMessage('')
+    try {
+      const { data } = await supabase.auth.getSession()
+      if (!data.session) throw new Error('Please sign in again.')
+      const response = await fetch(`${API_URL}/recruiter-requests/refresh-bookings`, { method: 'POST', headers: { Authorization: `Bearer ${data.session.access_token}` } })
+      const requests = await response.json()
+      if (!response.ok) throw new Error(requests.detail || 'Unable to refresh bookings.')
+      setRecruiterRequests(requests)
+      if (!requests.some((request: RecruiterRequest) => request.service_type === 'recruiter_session' && request.booking)) setBookingRefreshMessage(`We don't see your booking yet. Please make sure you booked with ${accountEmail || 'your account email'}. It can take a few minutes.`)
+    } catch (refreshError) { setBookingRefreshMessage(refreshError instanceof Error ? refreshError.message : 'Unable to refresh bookings.') } finally { setRefreshingBooking(false) }
+  }
 
   const startCheckout = async (productKey: string) => {
     setError('')
@@ -172,8 +193,9 @@ export default function BillingPage() {
         <h1 className='mt-3 text-3xl font-bold tracking-tight text-slate-900 sm:text-5xl'>Choose support for your job search.</h1>
         <p className='mt-4 max-w-3xl text-lg leading-8 text-slate-600'>Start free, buy a small pack when you need it, or book time with a recruiter. No subscription.</p>
 
-        {(hasReadySession || hasReadyReview || hasPendingSession) && <section id='recruiter-next-step' className='mt-6 scroll-mt-6'>
-          {hasReadySession && <div className='rounded-2xl border border-teal-200 bg-teal-50 p-6 sm:p-7' aria-label='Book your recruiter session'><h2 className='text-xl font-bold text-slate-900'>Book your 30-minute session</h2><p className='mt-2 max-w-3xl leading-7 text-slate-700'>Choose a time that suits you. Please book with the same email address you used for your purchase, so we can match your booking to your order. A Google Meet link is included in your confirmation.</p><p className='mt-2 text-sm text-slate-700'>One session per purchase. To reschedule or cancel, use the link in your Google confirmation email.</p><div className='mt-4 flex flex-wrap gap-3'>{SESSION_BOOKING_PAGES.map(page => <a key={page.url} href={page.url} target='_blank' rel='noopener noreferrer' className='rounded-xl bg-slate-900 px-5 py-3 text-sm font-semibold text-white hover:bg-slate-700'>{page.label}</a>)}</div></div>}
+        {(hasReadySession || hasReadyReview || hasPendingSession || bookedSessions.length > 0) && <section id='recruiter-next-step' className='mt-6 scroll-mt-6'>
+          {bookedSessions.map(request => { const booking = request.booking!; const time = new Intl.DateTimeFormat(undefined, { weekday: 'long', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }).format(new Date(booking.starts_at)); const team = booking.team === 'middle_east' ? 'Middle East' : 'North America'; return <div key={request.id} className='mb-4 rounded-2xl border border-teal-200 bg-teal-50 p-6'><h2 className='text-xl font-bold text-slate-900'>Your session: {time} with our {team} team</h2>{booking.meet_url && <a href={booking.meet_url} target='_blank' rel='noopener noreferrer' className='mt-3 inline-block font-semibold text-teal-800 underline'>Join Google Meet</a>}<p className='mt-3 text-sm text-slate-700'>To reschedule or cancel, use the link in your Google confirmation email.</p></div> })}
+          {hasReadySession && <div className='rounded-2xl border border-teal-200 bg-teal-50 p-6 sm:p-7' aria-label='Book your recruiter session'><h2 className='text-xl font-bold text-slate-900'>Book your 30-minute session</h2><p className='mt-2 max-w-3xl leading-7 text-slate-700'>Choose a time that suits you. Please book with the same email address you used for your purchase, so we can match your booking to your order. A Google Meet link is included in your confirmation.</p><p className='mt-2 text-sm text-slate-700'>One session per purchase. To reschedule or cancel, use the link in your Google confirmation email.</p><div className='mt-4 flex flex-wrap gap-3'>{SESSION_BOOKING_PAGES.map(page => <a key={page.url} href={page.url} target='_blank' rel='noopener noreferrer' className='rounded-xl bg-slate-900 px-5 py-3 text-sm font-semibold text-white hover:bg-slate-700'>{page.label}</a>)}<button type='button' onClick={() => void refreshBookings()} disabled={refreshingBooking} className='rounded-xl border border-slate-400 px-5 py-3 text-sm font-semibold text-slate-800 disabled:opacity-50'>{refreshingBooking ? 'Refreshing…' : "I've booked — refresh"}</button></div>{bookingRefreshMessage && <p role='status' className='mt-3 text-sm text-slate-700'>{bookingRefreshMessage}</p>}</div>}
           {hasPendingSession && <div className='rounded-2xl border border-slate-200 bg-white p-6'><h2 className='text-xl font-bold text-slate-900'>Session booking</h2><p className='mt-2 text-slate-700'>Complete your intake first, then choose a time (at least 48 hours ahead, so your recruiter can prepare).</p></div>}
           {hasReadyReview && <p className='mt-4 rounded-xl bg-teal-50 p-4 text-sm text-teal-900'>Delivered within 5 business days after your intake.</p>}
         </section>}
