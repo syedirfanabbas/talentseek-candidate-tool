@@ -8,7 +8,14 @@ import { LoadingSpinner } from './components/LoadingSpinner'
 import { AiProcessingNotice } from './components/AiProcessingNotice'
 import { Document, Packer, Paragraph, TextRun } from 'docx'
 import { saveAs } from 'file-saver'
+import { jsPDF } from 'jspdf'
 import { downloadResumeDocx, downloadResumePdf } from '../lib/resumeLayout'
+
+const RETRY_ADVICE = 'Please try again, or try a different file.'
+
+function withRetryAdvice(message: string): string {
+  return message.includes(RETRY_ADVICE) ? message : `${message.trim().replace(/[.\s]+$/, '')}. ${RETRY_ADVICE}`
+}
 
 function getInitials(name: string): string {
   return name.trim().split(/\s+/).map(w => w[0]?.toUpperCase() || '').join('')
@@ -123,8 +130,8 @@ export default function CandidateTool() {
       })
       if (!res.ok) throw new Error('Failed to parse file')
       const data = await res.json()
-      if (data.text) { setter(data.text) } else { setError(data.error || 'Could not extract text') }
-    } catch (err) { setError(err instanceof Error ? err.message : 'Upload failed') }
+      if (data.text) { setter(data.text) } else { setError(withRetryAdvice(data.error || 'Could not extract text')) }
+    } catch (err) { setError(withRetryAdvice(err instanceof Error ? err.message : 'Upload failed')) }
     finally { setUploading(false) }
   }
 
@@ -165,7 +172,7 @@ export default function CandidateTool() {
       )
       if (!outcome.ok) {
         const creditMessage = outOfCreditsMessage(outcome.status, outcome.body)
-        if (creditMessage) { setNeedsCredits(true); throw new Error(creditMessage) }
+        if (creditMessage) { setNeedsCredits(true); throw Object.assign(new Error(creditMessage), { noRetryAdvice: true }) }
         throw new Error(errorDetail(outcome.body, 'Optimization failed'))
       }
       const data = outcome.result
@@ -187,7 +194,7 @@ export default function CandidateTool() {
       } catch (_) {}
       finally { setIsAnalyzing(false) }
 
-    } catch (err) { setError(err instanceof Error ? err.message : 'Something went wrong') }
+    } catch (err) { setError(err instanceof Error && (err as Error & { noRetryAdvice?: boolean }).noRetryAdvice ? err.message : withRetryAdvice(err instanceof Error ? err.message : 'Something went wrong')) }
     finally { setIsLoading(false) }
   }
 
@@ -200,10 +207,10 @@ export default function CandidateTool() {
         method: 'POST', headers: { 'Content-Type': 'application/json', ...await getAuthHeaders() },
         body: JSON.stringify({ title: `Optimized resume — ${title}`, content, job_title: title, company_name: company }),
       })
-      if (!response.ok) throw new Error('This resume was not saved to your account. Please try again or download it.')
+      if (!response.ok) throw new Error(withRetryAdvice('This resume was not saved to your account.'))
       setOptimizedSaved(true)
       setOptimizedSaveMessage('Saved to My Resumes. You can open it any time from your dashboard.')
-    } catch (saveError) { setOptimizedSaveMessage(saveError instanceof Error ? saveError.message : 'This resume was not saved to your account. Please try again or download it.') }
+    } catch (saveError) { setOptimizedSaveMessage(withRetryAdvice(saveError instanceof Error ? saveError.message : 'This resume was not saved to your account.')) }
     setIsSavingOptimized(false)
   }
 
@@ -266,6 +273,41 @@ export default function CandidateTool() {
 
   const downloadPdf = () => {
     downloadResumePdf(optimizedResume, buildFilename(optimizedResume, jobDescription), targetPages())
+  }
+
+  const downloadAnalysisPdf = () => {
+    if (!analysis || analysis.error) return
+    const pdf = new jsPDF({ unit: 'pt', format: 'a4' })
+    const pageWidth = pdf.internal.pageSize.getWidth()
+    const pageHeight = pdf.internal.pageSize.getHeight()
+    const margin = 48
+    let y = margin
+    const write = (text: string, size = 11, bold = false) => {
+      pdf.setFont('helvetica', bold ? 'bold' : 'normal')
+      pdf.setFontSize(size)
+      const lines = pdf.splitTextToSize(text, pageWidth - margin * 2) as string[]
+      for (const line of lines) {
+        if (y > pageHeight - margin) { pdf.addPage(); y = margin }
+        pdf.text(line, margin, y)
+        y += size + 5
+      }
+      y += 5
+    }
+    write('Job match analysis', 18, true)
+    write(`Generated ${new Date().toLocaleDateString()}`)
+    write(`Overall match score: ${analysis.match_rate}% (${getMatchLabel(analysis.match_rate)})`, 13, true)
+    write(`Industry: ${analysis.industry_score}% (weight ${analysis.industry_weight})`)
+    write(`Experience: ${analysis.experience_score}% (weight ${analysis.experience_weight})`)
+    write(`Skills: ${analysis.skills_score}% (weight ${analysis.skills_weight})`)
+    write(`Competencies: ${analysis.competency_score}% (weight ${analysis.competency_weight})`)
+    const addList = (title: string, items: string[]) => {
+      write(title, 13, true)
+      ;(items || []).forEach(item => write(`• ${item}`))
+    }
+    addList('Strong matches', analysis.strong_matches)
+    addList('Moderate matches', analysis.moderate_matches)
+    addList('Gaps to address', analysis.gaps)
+    pdf.save('TalentSeek-job-match-analysis.pdf')
   }
 
   const getMatchColor = (score: number) =>
@@ -395,7 +437,7 @@ export default function CandidateTool() {
                       </button>
                     </div>
                   </div>
-                  {optimizedSaveMessage && <p className='mb-3 text-xs text-slate-500'>{optimizedSaveMessage}{optimizedSaved && <> <a href='/my-resumes' className='font-semibold text-slate-700 underline'>Open My Resumes</a></>}</p>}
+                  {optimizedSaveMessage && <p className={`mb-3 rounded-xl p-3 text-sm ${optimizedSaved ? 'bg-emerald-50 text-emerald-800' : 'bg-amber-50 text-amber-800'}`}>{optimizedSaved && '✓ '}{optimizedSaveMessage}{optimizedSaved && <> <a href='/my-resumes' className='font-semibold underline'>Open My Resumes</a></>}</p>}
                   <pre className='max-h-56 overflow-y-auto whitespace-pre-wrap rounded-xl bg-slate-100 p-4 text-sm text-slate-800'>{optimizedResume}</pre>
                 </div>
 
@@ -430,7 +472,7 @@ export default function CandidateTool() {
 
                 {analysis && !analysis.error && (
                   <div className='space-y-3'>
-                    <h3 className='font-semibold text-slate-800'>Job Match Analysis</h3>
+                    <div className='flex flex-wrap items-center justify-between gap-3'><h3 className='font-semibold text-slate-800'>Job Match Analysis</h3><button type='button' onClick={downloadAnalysisPdf} className='rounded-lg border border-red-300 bg-red-50 px-3 py-1.5 text-xs font-medium text-red-700 hover:bg-red-100'>Download analysis (PDF)</button></div>
 
                     <div className={`rounded-xl border p-4 ${getMatchColor(analysis.match_rate)}`}>
                       <div className='flex items-start justify-between'>

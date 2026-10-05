@@ -228,9 +228,9 @@ export default function AuthPage() {
           )}
 
           {mode === 'register' && (
-            <p className='mt-4 text-center text-xs leading-5 text-slate-500'>
+            <><p className='mt-4 text-center text-sm font-medium text-emerald-800'>Free to start: 1 tailored resume + 1 interview-prep pack. No card needed.</p><p className='mt-3 text-center text-xs leading-5 text-slate-500'>
               By creating an account you agree to the <a href={TERMS_URL} target='_blank' rel='noopener noreferrer' className='underline hover:text-slate-700'>Terms of Service</a> and acknowledge the <a href={PRIVACY_URL} target='_blank' rel='noopener noreferrer' className='underline hover:text-slate-700'>Privacy Policy</a>. Start free — no credit card required.
-            </p>
+            </p></>
           )}
         </div>
 
