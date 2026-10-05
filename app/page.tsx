@@ -172,7 +172,7 @@ export default function CandidateTool() {
       )
       if (!outcome.ok) {
         const creditMessage = outOfCreditsMessage(outcome.status, outcome.body)
-        if (creditMessage) { setNeedsCredits(true); throw new Error(creditMessage) }
+        if (creditMessage) { setNeedsCredits(true); throw Object.assign(new Error(creditMessage), { noRetryAdvice: true }) }
         throw new Error(errorDetail(outcome.body, 'Optimization failed'))
       }
       const data = outcome.result
@@ -194,7 +194,7 @@ export default function CandidateTool() {
       } catch (_) {}
       finally { setIsAnalyzing(false) }
 
-    } catch (err) { setError(withRetryAdvice(err instanceof Error ? err.message : 'Something went wrong')) }
+    } catch (err) { setError(err instanceof Error && (err as Error & { noRetryAdvice?: boolean }).noRetryAdvice ? err.message : withRetryAdvice(err instanceof Error ? err.message : 'Something went wrong')) }
     finally { setIsLoading(false) }
   }
 
@@ -302,7 +302,7 @@ export default function CandidateTool() {
     write(`Competencies: ${analysis.competency_score}% (weight ${analysis.competency_weight})`)
     const addList = (title: string, items: string[]) => {
       write(title, 13, true)
-      items.forEach(item => write(`• ${item}`))
+      ;(items || []).forEach(item => write(`• ${item}`))
     }
     addList('Strong matches', analysis.strong_matches)
     addList('Moderate matches', analysis.moderate_matches)
