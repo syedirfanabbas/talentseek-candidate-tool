@@ -3,6 +3,8 @@
 import { useEffect, useState } from 'react'
 import { LoadingSpinner } from '../components/LoadingSpinner'
 import { Document, Packer, Paragraph, TextRun, BorderStyle } from 'docx'
+import { BrandedReportPdf } from '../../lib/reportPdf'
+import { brandedReportDocx, NAVY } from '../../lib/reportDocx'
 import { saveAs } from 'file-saver'
 import jsPDF from 'jspdf'
 import { supabase } from '../../lib/supabase'
@@ -282,9 +284,21 @@ export default function RecruiterTool() {
   }
 
   const downloadFeedbackDocx = async () => {
-    const doc = new Document({ sections: [{ properties: { page: { margin: { top:720,bottom:720,left:1080,right:1080 } } }, children: buildFeedbackDocx(feedback, candidateName, targetRole) }] })
+    const doc = await brandedReportDocx('Recruiter feedback report', buildFeedbackDocx(feedback, candidateName, targetRole))
     saveAs(await Packer.toBlob(doc), `${candidateName.replace(/\s+/g,'-')}-feedback-report.docx`)
   }
+
+  const careerFilename = (extension: string) => { const role = (targetRole || 'career-analysis').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, ''); return `TalentSeek-career-analysis-${role}-${new Date().toISOString().slice(0, 10)}.${extension}` }
+  const careerSections = () => { if (!analysis) return []; return [
+    ['Career profile', [`Seniority: ${analysis.seniority_level}`, `Years of experience: ${analysis.years_experience}`]],
+    ['Core strengths', analysis.core_strengths],
+    ['Roles within the industry', analysis.within_industry.map(role => `${role.title} · Fit: ${role.fit} · Salary range: ${role.salary_cad}\n${role.why}`)],
+    ['Roles outside the industry', analysis.outside_industry.map(role => `${role.title} · ${role.industry} · Fit: ${role.fit} · Salary range: ${role.salary_cad}\n${role.why}`)],
+    ['Salary benchmark', [`Role: ${analysis.salary_benchmark.role}`, `Location: ${analysis.salary_benchmark.location}`, `Salary range: ${analysis.salary_benchmark.range_cad}`, analysis.salary_benchmark.notes]],
+    ['Career advice', [analysis.career_advice]],
+  ] as Array<[string, string[]]> }
+  const downloadCareerPdf = async () => { if (!analysis) return; const report = await BrandedReportPdf.create({ title: 'Career analysis', jobTitle: `${candidateName} · ${targetRole}`, disclaimerLines: ['Salary figures are AI estimates for guidance only, not offers or guarantees.'] }); careerSections().forEach(([title, items]) => { report.section(title); report.bullets(items) }); report.save(careerFilename('pdf')) }
+  const downloadCareerDocx = async () => { const children = careerSections().flatMap(([title, items]) => [new Paragraph({ spacing: { before: 220 }, children: [new TextRun({ text: title, bold: true, color: NAVY, size: 24 })] }), ...items.map(item => new Paragraph({ bullet: { level: 0 }, children: [new TextRun(item)] }))]); saveAs(await Packer.toBlob(await brandedReportDocx('Career analysis', children, 'Salary figures are AI estimates for guidance only, not offers or guarantees.')), careerFilename('docx')) }
 
   return (
     <main className='min-h-screen bg-slate-50 px-6 py-10'>
@@ -444,6 +458,7 @@ export default function RecruiterTool() {
 
                   {activeTab === 'career' && analysis && !analysis.error && (
                     <div className='space-y-6'>
+                      <div className='flex flex-wrap gap-2'><button onClick={() => void downloadCareerPdf()} className='rounded-lg border border-blue-300 bg-blue-50 px-3 py-1.5 text-xs font-medium text-blue-700 hover:bg-blue-100'>Download PDF</button><button onClick={() => void downloadCareerDocx()} className='rounded-lg border border-blue-300 bg-blue-50 px-3 py-1.5 text-xs font-medium text-blue-700 hover:bg-blue-100'>Download Word</button></div>
                       {/* Header */}
                       <div className='rounded-xl bg-slate-900 p-4 text-white'>
                         <div className='flex items-start justify-between'>
