@@ -10,7 +10,7 @@ type RecruiterRequest = { id: string; target_role: string; notes?: string; statu
 const choices = [
   {
     title: 'Tailor My Resume for a Job',
-    description: 'Start here. Upload your resume, paste the job description, and get a version tailored to that job, ready to send.',
+    description: 'Start here. Upload your resume, paste the job link or description, and get a version tailored to that job, ready to send.',
     action: 'Optimize my resume',
     href: '/',
     category: 'Get ready to apply',
