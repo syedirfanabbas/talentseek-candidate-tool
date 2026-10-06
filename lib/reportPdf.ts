@@ -1,6 +1,6 @@
 import { jsPDF } from 'jspdf'
 
-export type ReportMeta = { title: string; jobTitle?: string; company?: string; generatedAt?: Date; disclaimerLines?: string[] }
+export type ReportMeta = { title: string; jobTitle?: string; company?: string; preparedFor?: string; generatedAt?: Date; disclaimerLines?: string[] }
 
 type Score = { label: string; score: number }
 
@@ -96,8 +96,9 @@ export class BrandedReportPdf {
     this.pdf.setTextColor(NAVY)
     this.pdf.text(meta.title, MARGIN + 20, this.y)
     this.y += 29
-    const job = meta.jobTitle && meta.company ? `Prepared for: ${meta.jobTitle} at ${meta.company}` : meta.jobTitle ? `Prepared for: ${meta.jobTitle}` : ''
-    if (job) this.text(job, 10.5, false, 20)
+    const job = meta.preparedFor || (meta.jobTitle && meta.company ? `${meta.jobTitle} at ${meta.company}` : meta.jobTitle || '')
+    const prepared = job ? `Prepared for: ${job}` : ''
+    if (prepared) this.text(prepared, 10.5, false, 20)
     const generated = (meta.generatedAt || new Date()).toLocaleDateString(undefined, { month: 'long', day: 'numeric', year: 'numeric' })
     this.text(`Generated: ${generated}`, 10.5, false, 20)
     this.y += 24

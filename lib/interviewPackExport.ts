@@ -1,9 +1,6 @@
-// Export an interview-preparation pack as plain text, Word or PDF.
+// Export an interview-preparation pack as plain text or branded PDF.
 // Packs are not stored on our servers, so these are how a candidate keeps one.
-import { Packer, Paragraph, TextRun } from 'docx'
-import { saveAs } from 'file-saver'
 import { BrandedReportPdf } from './reportPdf'
-import { brandedReportDocx, NAVY } from './reportDocx'
 
 export type InterviewPack = {
   match_confidence: { score: number; label: string; summary: string }
@@ -54,16 +51,6 @@ export function packToText(pack: InterviewPack, context: PackContext): string {
     if (block.kind === 'question' || block.kind === 'footer') return `\n${block.text}`
     return block.text
   }).join('\n')
-}
-
-export async function downloadPackDocx(pack: InterviewPack, context: PackContext): Promise<void> {
-  const children = packBlocks(pack, context).filter(block => block.kind !== 'title' && block.kind !== 'footer').map(block => {
-    if (block.kind === 'heading') return new Paragraph({ spacing: { before: 240 }, children: [new TextRun({ text: block.text, bold: true, color: NAVY, size: 24 })] })
-    if (block.kind === 'question') return new Paragraph({ spacing: { before: 160 }, children: [new TextRun({ text: block.text, bold: true })] })
-    if (block.kind === 'bullet') return new Paragraph({ bullet: { level: 0 }, children: [new TextRun(block.text.replace(/^☐ /, ''))] })
-    return new Paragraph({ children: [new TextRun(block.text)] })
-  })
-  saveAs(await Packer.toBlob(await brandedReportDocx('Interview preparation pack', children, undefined, [context.jobTitle, context.companyName].filter(Boolean).join(' at ') + (context.interviewType ? ` · ${context.interviewType} interview` : ''))), packFilename(context, 'docx'))
 }
 
 export async function downloadPackPdf(pack: InterviewPack, context: PackContext): Promise<void> {

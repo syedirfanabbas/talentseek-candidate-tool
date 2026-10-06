@@ -4,7 +4,6 @@ import { useEffect, useState } from 'react'
 import { LoadingSpinner } from '../components/LoadingSpinner'
 import { Document, Packer, Paragraph, TextRun, BorderStyle } from 'docx'
 import { BrandedReportPdf } from '../../lib/reportPdf'
-import { brandedReportDocx, NAVY } from '../../lib/reportDocx'
 import { saveAs } from 'file-saver'
 import jsPDF from 'jspdf'
 import { supabase } from '../../lib/supabase'
@@ -81,33 +80,6 @@ function buildDocx(resumeText: string): Paragraph[] {
       spacing: { after: 60 },
     })
   })
-}
-
-function buildFeedbackDocx(feedback: string, candidateName: string, targetRole: string): Paragraph[] {
-  // Title, candidate and date come from the branded template (lib/reportDocx.ts).
-  const paras: Paragraph[] = []
-  feedback.split('\n').forEach(line => {
-    const t = line.trim()
-    if (!t) { paras.push(new Paragraph({ children: [], spacing: { after: 60 } })); return }
-    if (/^[A-Z][A-Z\s]{4,}$/.test(t)) {
-      paras.push(new Paragraph({
-        children: [new TextRun({ text: t, bold: true, size: 22, font: 'Calibri', color: '1E3A5F' })],
-        spacing: { before: 240, after: 80 },
-        border: { bottom: { color: '1E3A5F', size: 6, space: 1, style: BorderStyle.SINGLE } },
-      }))
-    } else if (t.startsWith('- ')) {
-      paras.push(new Paragraph({
-        children: [new TextRun({ text: t.slice(2), size: 19, font: 'Calibri' })],
-        bullet: { level: 0 }, spacing: { after: 60 },
-      }))
-    } else {
-      paras.push(new Paragraph({
-        children: [new TextRun({ text: t, size: 20, font: 'Calibri' })],
-        spacing: { after: 80 },
-      }))
-    }
-  })
-  return paras
 }
 
 const fitColor = (fit: string) =>
@@ -280,10 +252,15 @@ export default function RecruiterTool() {
     saveAs(await Packer.toBlob(doc), `${candidateName.replace(/\s+/g,'-')}-optimized.docx`)
   }
 
-  const downloadFeedbackDocx = async () => {
-    const doc = await brandedReportDocx('Recruiter feedback report', buildFeedbackDocx(feedback, candidateName, targetRole), undefined, [candidateName, targetRole].filter(Boolean).join(' · '))
-    saveAs(await Packer.toBlob(doc), `${candidateName.replace(/\s+/g,'-')}-feedback-report.docx`)
+  const feedbackFilename = () => { const role = (targetRole || 'recruiter-feedback').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, ''); return `TalentSeek-recruiter-feedback-${role}-${new Date().toISOString().slice(0, 10)}.pdf` }
+  const downloadFeedbackPdf = async () => {
+    const report = await BrandedReportPdf.create({ title: 'Recruiter feedback report', preparedFor: [candidateName, targetRole].filter(Boolean).join(' · ') })
+    let paragraphs: string[] = []
+    const flush = () => { paragraphs.forEach(text => report.paragraph(text)); paragraphs = [] }
+    feedback.split('\n').forEach(line => { const text = line.trim(); if (!text) { flush(); return } if (/^[A-Z][A-Z\s]{4,}$/.test(text)) { flush(); report.section(text) } else if (text.startsWith('- ')) { flush(); report.bullets([text.slice(2)]) } else paragraphs.push(text) })
+    flush(); report.save(feedbackFilename())
   }
+
 
   const careerFilename = (extension: string) => { const role = (targetRole || 'career-analysis').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, ''); return `TalentSeek-career-analysis-${role}-${new Date().toISOString().slice(0, 10)}.${extension}` }
   const careerSections = () => { if (!analysis) return []; return [
@@ -295,7 +272,7 @@ export default function RecruiterTool() {
     ['Career advice', [analysis.career_advice]],
   ] as Array<[string, string[]]> }
   const downloadCareerPdf = async () => { if (!analysis) return; const report = await BrandedReportPdf.create({ title: 'Career analysis', jobTitle: `${candidateName} · ${targetRole}`, disclaimerLines: ['Salary figures are AI estimates for guidance only, not offers or guarantees.'] }); careerSections().forEach(([title, items]) => { report.section(title); report.bullets(items) }); report.save(careerFilename('pdf')) }
-  const downloadCareerDocx = async () => { const children = careerSections().flatMap(([title, items]) => [new Paragraph({ spacing: { before: 220 }, children: [new TextRun({ text: title, bold: true, color: NAVY, size: 24 })] }), ...items.map(item => new Paragraph({ bullet: { level: 0 }, children: [new TextRun(item)] }))]); saveAs(await Packer.toBlob(await brandedReportDocx('Career analysis', children, 'Salary figures are AI estimates for guidance only, not offers or guarantees.', [candidateName, targetRole].filter(Boolean).join(' · '))), careerFilename('docx')) }
+
 
   return (
     <main className='min-h-screen bg-slate-50 px-6 py-10'>
@@ -445,9 +422,9 @@ export default function RecruiterTool() {
                     <div>
                       <div className='mb-4 flex items-center justify-between'>
                         <h3 className='font-semibold text-slate-800'>Recruiter Feedback Report</h3>
-                        <button onClick={downloadFeedbackDocx}
+                        <button onClick={() => void downloadFeedbackPdf()}
                           className='rounded-lg border border-blue-300 bg-blue-50 px-3 py-1.5 text-xs font-medium text-blue-700 hover:bg-blue-100'>
-                          📥 Download Report
+                          📥 Download PDF
                         </button>
                       </div>
                       <pre className='whitespace-pre-wrap rounded-xl bg-slate-50 p-4 text-sm text-slate-800 leading-relaxed'>{feedback}</pre>
@@ -456,7 +433,7 @@ export default function RecruiterTool() {
 
                   {activeTab === 'career' && analysis && !analysis.error && (
                     <div className='space-y-6'>
-                      <div className='flex flex-wrap gap-2'><button onClick={() => void downloadCareerPdf()} className='rounded-lg border border-blue-300 bg-blue-50 px-3 py-1.5 text-xs font-medium text-blue-700 hover:bg-blue-100'>Download PDF</button><button onClick={() => void downloadCareerDocx()} className='rounded-lg border border-blue-300 bg-blue-50 px-3 py-1.5 text-xs font-medium text-blue-700 hover:bg-blue-100'>Download Word</button></div>
+                      <div className='flex flex-wrap gap-2'><button onClick={() => void downloadCareerPdf()} className='rounded-lg border border-blue-300 bg-blue-50 px-3 py-1.5 text-xs font-medium text-blue-700 hover:bg-blue-100'>Download PDF</button></div>
                       {/* Header */}
                       <div className='rounded-xl bg-slate-900 p-4 text-white'>
                         <div className='flex items-start justify-between'>
