@@ -63,7 +63,7 @@ export async function downloadPackDocx(pack: InterviewPack, context: PackContext
     if (block.kind === 'bullet') return new Paragraph({ bullet: { level: 0 }, children: [new TextRun(block.text.replace(/^☐ /, ''))] })
     return new Paragraph({ children: [new TextRun(block.text)] })
   })
-  saveAs(await Packer.toBlob(await brandedReportDocx('Interview preparation pack', children)), packFilename(context, 'docx'))
+  saveAs(await Packer.toBlob(await brandedReportDocx('Interview preparation pack', children, undefined, [context.jobTitle, context.companyName].filter(Boolean).join(' at ') + (context.interviewType ? ` · ${context.interviewType} interview` : ''))), packFilename(context, 'docx'))
 }
 
 export async function downloadPackPdf(pack: InterviewPack, context: PackContext): Promise<void> {

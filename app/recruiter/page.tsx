@@ -82,16 +82,8 @@ function buildDocx(resumeText: string): Paragraph[] {
 }
 
 function buildFeedbackDocx(feedback: string, candidateName: string, targetRole: string): Paragraph[] {
-  const paras: Paragraph[] = [
-    new Paragraph({
-      children: [new TextRun({ text: `Recruiter Feedback Report`, bold: true, size: 32, font: 'Calibri', color: '1E3A5F' })],
-      spacing: { after: 80 },
-    }),
-    new Paragraph({
-      children: [new TextRun({ text: `Candidate: ${candidateName}  |  Target Role: ${targetRole}`, size: 20, font: 'Calibri', color: '555555' })],
-      spacing: { after: 200 },
-    }),
-  ]
+  // Title, candidate and date come from the branded template (lib/reportDocx.ts).
+  const paras: Paragraph[] = []
   feedback.split('\n').forEach(line => {
     const t = line.trim()
     if (!t) { paras.push(new Paragraph({ children: [], spacing: { after: 60 } })); return }
@@ -284,7 +276,7 @@ export default function RecruiterTool() {
   }
 
   const downloadFeedbackDocx = async () => {
-    const doc = await brandedReportDocx('Recruiter feedback report', buildFeedbackDocx(feedback, candidateName, targetRole))
+    const doc = await brandedReportDocx('Recruiter feedback report', buildFeedbackDocx(feedback, candidateName, targetRole), undefined, [candidateName, targetRole].filter(Boolean).join(' · '))
     saveAs(await Packer.toBlob(doc), `${candidateName.replace(/\s+/g,'-')}-feedback-report.docx`)
   }
 
@@ -298,7 +290,7 @@ export default function RecruiterTool() {
     ['Career advice', [analysis.career_advice]],
   ] as Array<[string, string[]]> }
   const downloadCareerPdf = async () => { if (!analysis) return; const report = await BrandedReportPdf.create({ title: 'Career analysis', jobTitle: `${candidateName} · ${targetRole}`, disclaimerLines: ['Salary figures are AI estimates for guidance only, not offers or guarantees.'] }); careerSections().forEach(([title, items]) => { report.section(title); report.bullets(items) }); report.save(careerFilename('pdf')) }
-  const downloadCareerDocx = async () => { const children = careerSections().flatMap(([title, items]) => [new Paragraph({ spacing: { before: 220 }, children: [new TextRun({ text: title, bold: true, color: NAVY, size: 24 })] }), ...items.map(item => new Paragraph({ bullet: { level: 0 }, children: [new TextRun(item)] }))]); saveAs(await Packer.toBlob(await brandedReportDocx('Career analysis', children, 'Salary figures are AI estimates for guidance only, not offers or guarantees.')), careerFilename('docx')) }
+  const downloadCareerDocx = async () => { const children = careerSections().flatMap(([title, items]) => [new Paragraph({ spacing: { before: 220 }, children: [new TextRun({ text: title, bold: true, color: NAVY, size: 24 })] }), ...items.map(item => new Paragraph({ bullet: { level: 0 }, children: [new TextRun(item)] }))]); saveAs(await Packer.toBlob(await brandedReportDocx('Career analysis', children, 'Salary figures are AI estimates for guidance only, not offers or guarantees.', [candidateName, targetRole].filter(Boolean).join(' · '))), careerFilename('docx')) }
 
   return (
     <main className='min-h-screen bg-slate-50 px-6 py-10'>
