@@ -7,6 +7,7 @@ import { Document, Packer, Paragraph, TextRun, BorderStyle } from 'docx'
 import { saveAs } from 'file-saver'
 import jsPDF from 'jspdf'
 import { supabase } from '../../lib/supabase'
+import { apiErrorMessage } from '../../lib/apiError'
 
 const MAX_RESUMES = 10
 
@@ -77,11 +78,7 @@ function buildDocxParagraphs(resumeText: string): Paragraph[] {
   })
 }
 
-// Shows the backend's explanation (e.g. a usage limit and when to retry) when it gives one.
-async function errorMessage(res: Response, fallback: string): Promise<string> {
-  const body = await res.json().catch(() => null)
-  return typeof body?.detail === 'string' ? body.detail : fallback
-}
+async function errorMessage(res: Response, fallback: string): Promise<string> { return apiErrorMessage(await res.json().catch(() => null), fallback) }
 
 export default function MasterResume() {
   const [files, setFiles] = useState<{ name: string; text: string }[]>([])
@@ -144,7 +141,7 @@ export default function MasterResume() {
         if (data.text) {
           setFiles(prev => [...prev, { name: file.name, text: data.text }])
         } else {
-          setError(data.error || 'Could not extract text from ' + file.name)
+          setError(typeof data.error === 'string' ? data.error : apiErrorMessage(data, 'Could not extract text from ' + file.name))
         }
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Upload failed')

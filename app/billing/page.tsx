@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import { supabase } from '../../lib/supabase'
 import { PRIVACY_URL, TERMS_URL } from '../../lib/legal'
 import { SESSION_BOOKING_PAGES } from '../../lib/booking'
+import { apiErrorMessage } from '../../lib/apiError'
 
 type BillingSummary = {
   entitlement: { plan_key: string; subscription_status: string; subscription_period_end?: string | null }
@@ -50,7 +51,7 @@ function RecruiterIntakeCard({ request, apiUrl, onSubmitted }: { request: Recrui
     setMessage('')
     const response = await fetch(`${apiUrl}/resumes/fetch-job`, { method: 'POST', headers: { 'Content-Type': 'application/json', ...await authHeaders() }, body: JSON.stringify({ url: jobLinks[index] }) })
     const data = await response.json()
-    if (!response.ok || !data.text) { setMessage(data.error || 'Unable to read that job link.'); return }
+    if (!response.ok || !data.text) { setMessage(typeof data.error === 'string' ? data.error : apiErrorMessage(data, 'Unable to read that job link.')); return }
     updateAd(index, String(data.text).slice(0, 20000))
   }
   const parseResume = async (file: File) => {
@@ -66,14 +67,7 @@ function RecruiterIntakeCard({ request, apiUrl, onSubmitted }: { request: Recrui
       const response = await fetch(`${apiUrl}/recruiter-requests/${request.id}/intake`, { method: 'PUT', headers: { 'Content-Type': 'application/json', ...await authHeaders() }, body: JSON.stringify({ goal, ...form, job_ads: jobAds.filter(Boolean), resume_text: resume, resume_label: resumeLabel }) })
       const data = await response.json()
       if (!response.ok) {
-        // FastAPI validation errors arrive as a list: [{loc: [..., field], msg}]
-        const detail = Array.isArray(data.detail)
-          ? data.detail.map((item: { loc?: unknown[]; msg?: string }) => {
-              const field = String(item.loc?.[item.loc.length - 1] ?? '').replace(/_/g, ' ')
-              return `${field ? field.charAt(0).toUpperCase() + field.slice(1) + ': ' : ''}${(item.msg || '').replace(/^Value error, /, '')}`
-            }).join(' · ')
-          : data.detail
-        throw new Error(detail || 'Unable to submit your intake.')
+        throw new Error(apiErrorMessage(data, 'Unable to submit your intake.'))
       }
       onSubmitted(data); setMessage('Thanks, your recruiter will review this before your session.')
     } catch (error) { setMessage(error instanceof Error ? error.message : 'Unable to submit your intake.') } finally { setSaving(false) }
@@ -154,7 +148,7 @@ export default function BillingPage() {
       if (!data.session) throw new Error('Please sign in again.')
       const response = await fetch(`${API_URL}/recruiter-requests/refresh-bookings`, { method: 'POST', headers: { Authorization: `Bearer ${data.session.access_token}` } })
       const requests = await response.json()
-      if (!response.ok) throw new Error(requests.detail || 'Unable to refresh bookings.')
+      if (!response.ok) throw new Error(apiErrorMessage(requests, 'Unable to refresh bookings.'))
       setRecruiterRequests(requests)
       if (!requests.some((request: RecruiterRequest) => request.service_type === 'recruiter_session' && request.booking)) setBookingRefreshMessage(`We don't see your booking yet. Please make sure you booked with ${accountEmail || 'your account email'}. It can take a few minutes.`)
     } catch (refreshError) { setBookingRefreshMessage(refreshError instanceof Error ? refreshError.message : 'Unable to refresh bookings.') } finally { setRefreshingBooking(false) }
@@ -178,7 +172,7 @@ export default function BillingPage() {
         body: JSON.stringify({ product_key: productKey }),
       })
       const result = await response.json()
-      if (!response.ok || !result.checkout_url) throw new Error(result.detail || 'Unable to start checkout.')
+      if (!response.ok || !result.checkout_url) throw new Error(apiErrorMessage(result, 'Unable to start checkout.'))
       window.location.assign(result.checkout_url)
     } catch (checkoutError) {
       setError(checkoutError instanceof Error ? checkoutError.message : 'Unable to start checkout.')

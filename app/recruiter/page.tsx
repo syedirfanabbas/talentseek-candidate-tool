@@ -8,6 +8,8 @@ import { brandedReportDocx, NAVY } from '../../lib/reportDocx'
 import { saveAs } from 'file-saver'
 import jsPDF from 'jspdf'
 import { supabase } from '../../lib/supabase'
+import { useJobLink } from '../../lib/useJobLink'
+import { apiErrorMessage } from '../../lib/apiError'
 
 type CareerAnalysis = {
   seniority_level: string
@@ -122,6 +124,7 @@ export default function RecruiterTool() {
   const [customInstructions, setCustomInstructions] = useState('')
   const [resume, setResume] = useState('')
   const [jobDescription, setJobDescription] = useState('')
+  const [targetRoleAuto, setTargetRoleAuto] = useState(false)
   const [resumeLength, setResumeLength] = useState(2)
 
   const [optimized, setOptimized] = useState('')
@@ -147,6 +150,8 @@ export default function RecruiterTool() {
   }
 
 
+  const { jobLink, setJobLink, isFetchingJob, jobLinkError, fetchJobText } = useJobLink({ apiUrl: API_URL, authHeaders: getAuthHeaders, onSuccess: data => { setJobDescription(data.text); if (data.job_title && (!targetRole.trim() || targetRoleAuto)) { setTargetRole(data.job_title); setTargetRoleAuto(true) } } })
+
   const parseFile = async (file: File, setter: (t: string) => void, setUploading: (b: boolean) => void) => {
     setUploading(true); setError('')
     try {
@@ -160,7 +165,7 @@ export default function RecruiterTool() {
       if (!res.ok) throw new Error('Failed to parse file')
       const data = await res.json()
       if (data.text) setter(data.text)
-      else setError(data.error || 'Could not extract text')
+      else setError(typeof data.error === 'string' ? data.error : apiErrorMessage(data, 'Could not extract text'))
     } catch (err) { setError(err instanceof Error ? err.message : 'Upload failed') }
     finally { setUploading(false) }
   }
@@ -325,7 +330,7 @@ export default function RecruiterTool() {
 
             <div className='mb-4'>
               <label className='mb-1 block text-xs font-medium text-slate-600'>Target Role</label>
-              <input value={targetRole} onChange={e => setTargetRole(e.target.value)}
+              <input value={targetRole} onChange={e => { setTargetRoleAuto(false); setTargetRole(e.target.value) }}
                 placeholder='e.g. Senior Manager, Credit Risk'
                 className='w-full rounded-xl border border-slate-200 bg-white p-3 text-sm text-slate-900 placeholder:text-slate-400 outline-none focus:border-slate-500 shadow-sm' />
             </div>
@@ -342,6 +347,7 @@ export default function RecruiterTool() {
               className='mb-4 min-h-[120px] w-full rounded-xl border border-slate-200 bg-white p-3 text-sm text-slate-900 placeholder:text-slate-400 outline-none focus:border-slate-500 shadow-sm' />
 
             <h2 className='mb-3 text-lg font-semibold text-slate-900'>Job Description</h2>
+            <div className='mb-3 flex gap-2'><input value={jobLink} onChange={e => setJobLink(e.target.value)} placeholder='Paste a job link' className='min-w-0 flex-1 rounded-xl border border-slate-200 p-2 text-sm text-slate-900' /><button type='button' disabled={isFetchingJob} onClick={() => void fetchJobText()} className='rounded-xl border border-slate-300 px-3 text-xs font-medium text-slate-700'>{isFetchingJob ? 'Getting…' : 'Get job text'}</button></div>{jobLinkError && <p className='mb-2 text-xs text-red-700'>{jobLinkError}</p>}
             <label className='mb-3 flex cursor-pointer items-center gap-2 rounded-xl border border-dashed border-slate-300 px-4 py-3 text-sm text-slate-600 hover:border-slate-400'>
               <input type='file' accept='.pdf,.docx' className='hidden'
                 onChange={e => { const f = e.target.files?.[0]; if (f) parseFile(f, setJobDescription, setUploadingJD); e.target.value = '' }}

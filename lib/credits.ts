@@ -1,17 +1,9 @@
+import { apiErrorMessage } from './apiError'
 const FALLBACK_MESSAGE = 'You have used all of your credits. Buy a pack to continue.'
-
-type ErrorBody = { detail?: string | { code?: string; message?: string } } | null
-
-// Returns the message to show when the backend refused an AI request for lack of credits.
+type ErrorBody = { detail?: unknown } | null
 export function outOfCreditsMessage(status: number, body: ErrorBody): string | null {
   if (status !== 402) return null
   const detail = body?.detail
-  return typeof detail === 'object' && detail?.code === 'insufficient_credits' && detail.message ? detail.message : FALLBACK_MESSAGE
+  return detail && typeof detail === 'object' && !Array.isArray(detail) && (detail as { code?: string }).code === 'insufficient_credits' && typeof (detail as { message?: unknown }).message === 'string' ? (detail as { message: string }).message : FALLBACK_MESSAGE
 }
-
-// FastAPI returns `detail` as a string for ordinary errors and as an object for structured ones.
-export function errorDetail(body: ErrorBody, fallback: string): string {
-  const detail = body?.detail
-  if (typeof detail === 'string') return detail
-  return detail?.message || fallback
-}
+export function errorDetail(body: ErrorBody, fallback: string): string { return apiErrorMessage(body, fallback) }
