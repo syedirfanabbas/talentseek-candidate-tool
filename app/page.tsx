@@ -73,6 +73,7 @@ export default function CandidateTool() {
   const [isAnalyzing, setIsAnalyzing] = useState(false)
   const [error, setError] = useState('')
   const [needsCredits, setNeedsCredits] = useState(false)
+  const [freeAllowanceGranted, setFreeAllowanceGranted] = useState<boolean | null>(null)
   const [uploadingResume, setUploadingResume] = useState(false)
   const [uploadingJD, setUploadingJD] = useState(false)
   const [resumeLength, setResumeLength] = useState('2')
@@ -89,6 +90,7 @@ export default function CandidateTool() {
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data }) => setUser(data.user))
+    void (async () => { const { data } = await supabase.auth.getSession(); if (data.session) { const r = await fetch(`${API_URL}/billing/me`, { headers: { Authorization: `Bearer ${data.session.access_token}` } }); if (r.ok) setFreeAllowanceGranted((await r.json()).free_allowance_granted) } })()
     const storedJobDescription = sessionStorage.getItem('talentseek-job-description')
     if (storedJobDescription) {
       setJobDescription(storedJobDescription)
@@ -177,7 +179,7 @@ export default function CandidateTool() {
         authHeaders,
       )
       if (!outcome.ok) {
-        const creditMessage = outOfCreditsMessage(outcome.status, outcome.body)
+        const creditMessage = (freeAllowanceGranted === false && outcome.status === 402 ? 'The free allowance is one per person. Buy a pack to continue.' : outOfCreditsMessage(outcome.status, outcome.body))
         if (creditMessage) { setNeedsCredits(true); throw Object.assign(new Error(creditMessage), { noRetryAdvice: true }) }
         throw new Error(errorDetail(outcome.body, 'Optimization failed'))
       }

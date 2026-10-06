@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { supabase } from '../../lib/supabase'
 import { defaultDestinationForRole, safeReturnTo } from '../../lib/navigation'
 import { isEmailNotConfirmed } from '../../lib/authErrors'
@@ -16,6 +16,17 @@ export default function AuthPage() {
   // Set when the account exists but its email is not confirmed yet, so the user can request a new link.
   const [unconfirmedEmail, setUnconfirmedEmail] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(false)
+  const widgetRef = useRef<HTMLDivElement>(null)
+  const widgetId = useRef<string | number | null>(null)
+  const [captchaToken, setCaptchaToken] = useState('')
+  const siteKey = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY
+  useEffect(() => {
+    if (!siteKey || !widgetRef.current) return
+    const render = () => { const turnstile = (window as any).turnstile; if (turnstile && widgetRef.current && widgetId.current === null) widgetId.current = turnstile.render(widgetRef.current, { sitekey: siteKey, callback: (token: string) => setCaptchaToken(token), 'error-callback': () => setMessage({ text: 'Security check failed. Please try again.', type: 'error' }) }) }
+    const script = document.createElement('script'); script.src = 'https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit'; script.async = true; script.onload = render; document.head.appendChild(script); render()
+    return () => { script.remove() }
+  }, [siteKey])
+  const resetCaptcha = () => { const turnstile = (window as any).turnstile; if (turnstile && widgetId.current !== null) turnstile.reset(widgetId.current); setCaptchaToken('') }
   const [message, setMessage] = useState<{ text: string; type: 'success' | 'error' } | null>(null)
 
   const resendConfirmation = async () => {
@@ -24,9 +35,10 @@ export default function AuthPage() {
     const { error } = await supabase.auth.resend({
       type: 'signup',
       email: unconfirmedEmail,
-      options: { emailRedirectTo: `${window.location.origin}/auth` },
+      options: { emailRedirectTo: `${window.location.origin}/auth`, ...(captchaToken ? { captchaToken } : {}) },
     })
     setIsLoading(false)
+    resetCaptcha()
     setMessage(error
       ? { text: /rate limit|too many requests|seconds/i.test(error.message) ? 'Please wait a minute before requesting another confirmation email.' : error.message, type: 'error' }
       : { text: `A new confirmation link was sent to ${unconfirmedEmail}. It is valid for 24 hours. If you don't see it, check your spam or junk folder.`, type: 'success' })
@@ -55,7 +67,7 @@ export default function AuthPage() {
     try {
       if (mode === 'forgot') {
         const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), {
-          redirectTo: `${window.location.origin}/auth/reset-password`,
+          redirectTo: `${window.location.origin}/auth/reset-password`, ...(captchaToken ? { captchaToken } : {}),
         })
         if (error) throw error
         setMessage({ text: 'If an account exists for this email, a password-reset link is on its way. Please check your inbox and spam folder.', type: 'success' })
@@ -64,7 +76,7 @@ export default function AuthPage() {
           email: email.trim(),
           password,
           options: {
-            emailRedirectTo: `${window.location.origin}/auth`,
+            emailRedirectTo: `${window.location.origin}/auth`, ...(captchaToken ? { captchaToken } : {}),
             data: {
               full_name: name,
               account_type: accountType,
@@ -88,7 +100,7 @@ export default function AuthPage() {
         setUnconfirmedEmail(email.trim())
         setMode('login')
       } else {
-        const { data, error } = await supabase.auth.signInWithPassword({ email: email.trim(), password })
+        const { data, error } = await supabase.auth.signInWithPassword({ email: email.trim(), password, ...(captchaToken ? { captchaToken } : {}) })
         if (error) throw error
         setMessage({ text: 'Login successful! Redirecting...', type: 'success' })
         window.location.replace(next ? destination : defaultDestinationForRole(data.user?.app_metadata?.role, data.user?.user_metadata?.account_type))
@@ -108,6 +120,7 @@ export default function AuthPage() {
         type: 'error',
       })
     } finally {
+      resetCaptcha()
       setIsLoading(false)
     }
   }
@@ -202,6 +215,8 @@ export default function AuthPage() {
               </label>
             )}
           </div>
+
+          {siteKey && <div ref={widgetRef} className='mt-4' />}
 
           {message && (
             <div className={`mt-4 rounded-xl p-3 text-sm ${

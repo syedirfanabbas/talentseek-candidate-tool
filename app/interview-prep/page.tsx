@@ -29,6 +29,7 @@ export default function InterviewPreparationPage() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [needsCredits, setNeedsCredits] = useState(false)
+  const [freeAllowanceGranted, setFreeAllowanceGranted] = useState<boolean | null>(null)
   const [kept, setKept] = useState(false)
   const [exportMessage, setExportMessage] = useState('')
   const [savedResumes, setSavedResumes] = useState<SavedResume[]>([])
@@ -44,6 +45,7 @@ export default function InterviewPreparationPage() {
 
   // Offer the user's saved resumes, and pick up one sent from My Resumes.
   useEffect(() => {
+    void (async () => { const { data } = await supabase.auth.getSession(); if (data.session) { const r = await fetch(`${API_URL}/billing/me`, { headers: { Authorization: `Bearer ${data.session.access_token}` } }); if (r.ok) setFreeAllowanceGranted((await r.json()).free_allowance_granted) } })()
     const prefill = takeInterviewPrefill()
     if (prefill) {
       setResumeText(prefill.resumeText)
@@ -114,7 +116,7 @@ export default function InterviewPreparationPage() {
         { job_title: jobTitle.trim(), company_name: companyName.trim(), interview_type: interviewType, job_description: jobDescription.trim(), resume_text: resumeText.trim() || undefined },
         headers)
       if (!outcome.ok) {
-        const creditMessage = outOfCreditsMessage(outcome.status, outcome.body)
+        const creditMessage = (freeAllowanceGranted === false && outcome.status === 402 ? 'The free allowance is one per person. Buy a pack to continue.' : outOfCreditsMessage(outcome.status, outcome.body))
         if (creditMessage) { setNeedsCredits(true); throw new Error(creditMessage) }
         throw new Error(errorDetail(outcome.body, 'Unable to generate your interview preparation pack.'))
       }
