@@ -1,8 +1,9 @@
 // Export an interview-preparation pack as plain text, Word or PDF.
 // Packs are not stored on our servers, so these are how a candidate keeps one.
-import { Document, Packer, Paragraph, TextRun, HeadingLevel } from 'docx'
+import { Packer, Paragraph, TextRun } from 'docx'
 import { saveAs } from 'file-saver'
-import jsPDF from 'jspdf'
+import { BrandedReportPdf } from './reportPdf'
+import { brandedReportDocx, NAVY } from './reportDocx'
 
 export type InterviewPack = {
   match_confidence: { score: number; label: string; summary: string }
@@ -56,41 +57,23 @@ export function packToText(pack: InterviewPack, context: PackContext): string {
 }
 
 export async function downloadPackDocx(pack: InterviewPack, context: PackContext): Promise<void> {
-  const children = packBlocks(pack, context).map(block => {
-    if (block.kind === 'title') return new Paragraph({ heading: HeadingLevel.HEADING_1, children: [new TextRun(block.text)] })
-    if (block.kind === 'heading') return new Paragraph({ heading: HeadingLevel.HEADING_2, spacing: { before: 240 }, children: [new TextRun(block.text)] })
+  const children = packBlocks(pack, context).filter(block => block.kind !== 'title' && block.kind !== 'footer').map(block => {
+    if (block.kind === 'heading') return new Paragraph({ spacing: { before: 240 }, children: [new TextRun({ text: block.text, bold: true, color: NAVY, size: 24 })] })
     if (block.kind === 'question') return new Paragraph({ spacing: { before: 160 }, children: [new TextRun({ text: block.text, bold: true })] })
     if (block.kind === 'bullet') return new Paragraph({ bullet: { level: 0 }, children: [new TextRun(block.text.replace(/^☐ /, ''))] })
-    if (block.kind === 'footer') return new Paragraph({ spacing: { before: 360 }, children: [new TextRun({ text: block.text, italics: true, color: '64748B' })] })
     return new Paragraph({ children: [new TextRun(block.text)] })
   })
-  const doc = new Document({ sections: [{ properties: { page: { margin: { top: 720, bottom: 720, left: 1080, right: 1080 } } }, children }] })
-  saveAs(await Packer.toBlob(doc), packFilename(context, 'docx'))
+  saveAs(await Packer.toBlob(await brandedReportDocx('Interview preparation pack', children, undefined, [context.jobTitle, context.companyName].filter(Boolean).join(' at ') + (context.interviewType ? ` · ${context.interviewType} interview` : ''))), packFilename(context, 'docx'))
 }
 
-export function downloadPackPdf(pack: InterviewPack, context: PackContext): void {
-  const doc = new jsPDF({ unit: 'pt', format: 'letter' })
-  const margin = 56
-  const pageW = doc.internal.pageSize.getWidth()
-  const pageH = doc.internal.pageSize.getHeight()
-  const maxW = pageW - margin * 2
-  let y = margin
-  const write = (text: string, size: number, style: 'normal' | 'bold', indent = 0, gapBefore = 0) => {
-    y += gapBefore
-    doc.setFont('helvetica', style); doc.setFontSize(size)
-    for (const line of doc.splitTextToSize(text, maxW - indent) as string[]) {
-      if (y + size > pageH - margin) { doc.addPage(); y = margin }
-      doc.text(line, margin + indent, y); y += size + 4
-    }
-  }
-  for (const block of packBlocks(pack, context)) {
-    if (block.kind === 'title') write(block.text, 16, 'bold', 0, 0)
-    else if (block.kind === 'heading') write(block.text, 12, 'bold', 0, 12)
-    else if (block.kind === 'question') write(block.text, 10.5, 'bold', 0, 6)
-    // The default PDF font has no checkbox glyph, so the checklist uses a plain box marker.
-    else if (block.kind === 'bullet') write(`•  ${block.text.replace(/^☐ /, '[ ] ')}`, 10, 'normal', 10)
-    else if (block.kind === 'footer') write(block.text, 8.5, 'normal', 0, 16)
-    else write(block.text, 10, 'normal')
-  }
-  doc.save(packFilename(context, 'pdf'))
+export async function downloadPackPdf(pack: InterviewPack, context: PackContext): Promise<void> {
+  const report = await BrandedReportPdf.create({ title: 'Interview preparation pack', jobTitle: context.jobTitle, company: context.companyName })
+  report.paragraph(`${context.interviewType} · Resume match ${pack.match_confidence.score}% (${pack.match_confidence.label})`)
+  report.paragraph(pack.match_confidence.summary)
+  report.section('What this role needs'); report.paragraph(pack.role_summary)
+  report.section('Skills to demonstrate'); report.bullets(pack.skills_to_demonstrate)
+  report.section('Likely interview questions'); pack.likely_questions.forEach((item, i) => { report.paragraph(`${i + 1}. ${item.question} (${item.category})`); report.bullets(item.answer_points) })
+  report.section('Questions to ask'); report.bullets(pack.questions_to_ask)
+  report.section('Interview checklist'); report.bullets(pack.checklist.map(item => `[ ] ${item}`))
+  report.save(packFilename(context, 'pdf'))
 }
