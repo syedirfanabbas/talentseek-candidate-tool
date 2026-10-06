@@ -100,7 +100,7 @@ export default function AuthPage() {
         setUnconfirmedEmail(email.trim())
         setMode('login')
       } else {
-        const { data, error } = await supabase.auth.signInWithPassword({ email: email.trim(), password, ...(captchaToken ? { captchaToken } : {}) })
+        const { data, error } = await supabase.auth.signInWithPassword({ email: email.trim(), password, ...(captchaToken ? { options: { captchaToken } } : {}) })
         if (error) throw error
         setMessage({ text: 'Login successful! Redirecting...', type: 'success' })
         window.location.replace(next ? destination : defaultDestinationForRole(data.user?.app_metadata?.role, data.user?.user_metadata?.account_type))
