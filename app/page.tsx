@@ -1,6 +1,8 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
+import { useJobLink } from '../lib/useJobLink'
+import { apiErrorMessage } from '../lib/apiError'
 import { supabase } from '../lib/supabase'
 import { errorDetail, outOfCreditsMessage } from '../lib/credits'
 import { runAiJob } from '../lib/aiJobs'
@@ -62,9 +64,6 @@ type AnalysisResult = {
 export default function CandidateTool() {
   const [resume, setResume] = useState('')
   const [jobDescription, setJobDescription] = useState('')
-  const [jobLink, setJobLink] = useState('')
-  const [isFetchingJob, setIsFetchingJob] = useState(false)
-  const [jobLinkError, setJobLinkError] = useState('')
   const [role, setRole] = useState('')
   const [company, setCompany] = useState('')
   const [optimizedResume, setOptimizedResume] = useState('')
@@ -147,30 +146,17 @@ export default function CandidateTool() {
       })
       if (!res.ok) throw new Error('Failed to parse file')
       const data = await res.json()
-      if (data.text) { setter(data.text) } else { setError(withRetryAdvice(data.error || 'Could not extract text')) }
+      if (data.text) { setter(data.text) } else { setError(withRetryAdvice(typeof data.error === 'string' ? data.error : apiErrorMessage(data, 'Could not extract text'))) }
     } catch (err) { setError(withRetryAdvice(err instanceof Error ? err.message : 'Upload failed')) }
     finally { setUploading(false) }
   }
 
-  const fetchJobText = async () => {
-    if (!jobLink.trim()) { setJobLinkError('Paste a job link first.'); return }
-    setIsFetchingJob(true); setJobLinkError(''); setError('')
-    try {
-      const response = await fetch(`${API_URL}/resumes/fetch-job`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', ...await getAuthHeaders() },
-        body: JSON.stringify({ url: jobLink.trim() }),
-      })
-      const data = await response.json()
-      if (!response.ok || !data.text) throw new Error(data.error || 'We could not read that job page. Please paste the description instead.')
-      linkedJobText.current = data.job_title || data.company_name ? data.text : null
-      setJobDescription(data.text)
-      if (data.job_title) { setRole(data.job_title); setRoleEdited(false) }
-      if (data.company_name) { setCompany(data.company_name); setCompanyEdited(false) }
-    } catch (fetchError) {
-      setJobLinkError(fetchError instanceof Error ? fetchError.message : 'We could not read that job page. Please paste the description instead.')
-    } finally { setIsFetchingJob(false) }
-  }
+  const { jobLink, setJobLink, isFetchingJob, jobLinkError, fetchJobText } = useJobLink({ apiUrl: API_URL, authHeaders: getAuthHeaders, onSuccess: data => {
+    linkedJobText.current = data.job_title || data.company_name ? data.text : null
+    setJobDescription(data.text)
+    if (data.job_title) { setRole(data.job_title); setRoleEdited(false) }
+    if (data.company_name) { setCompany(data.company_name); setCompanyEdited(false) }
+  } })
 
   const handleResumeFile = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]; if (file) { setResumeSource(''); parseFile(file, setResume, setUploadingResume) }
