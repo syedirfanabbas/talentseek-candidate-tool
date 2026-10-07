@@ -12,7 +12,6 @@ import { takeInterviewPrefill } from '../../lib/interviewPrefill'
 
 type SavedResume = { key: string; label: string; content: string; jobTitle?: string; companyName?: string }
 
-const LEAVE_WARNING = 'Your interview pack is not saved to your account. Download or copy it before you leave, or it will be lost.'
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
 const interviewTypes = ['Recruiter screen', 'Hiring manager', 'Technical', 'Behavioural', 'Final interview']
@@ -140,12 +139,10 @@ export default function InterviewPreparationPage() {
       setKept(true)
     } catch { setExportMessage(action === 'copy' ? 'Copying was blocked by your browser. Please use Download instead.' : 'The download did not start. Please try again.') }
   }
-  const confirmLeave = (event: React.MouseEvent) => { if (pack && !kept && !window.confirm(LEAVE_WARNING)) event.preventDefault() }
 
   const toggleChecklist = (item: string) => setChecked(current => current.includes(item) ? current.filter(entry => entry !== item) : [...current, item])
 
   return <main className='min-h-screen bg-slate-50 px-6 py-10'><div className='mx-auto max-w-5xl'>
-    <a href='/dashboard' onClick={confirmLeave} className='text-sm text-slate-500 hover:text-slate-700'>← Back to What would you like to do?</a>
     <header className='mt-6 max-w-3xl'><p className='text-sm font-semibold uppercase tracking-widest text-teal-700'>Interview preparation</p><h1 className='mt-3 text-3xl font-bold tracking-tight text-slate-900 sm:text-5xl'>Walk into your interview prepared.</h1><p className='mt-4 text-lg leading-8 text-slate-600'>Get likely questions, preparation priorities, and clear ways to connect your experience to the role.</p></header>
 
     <form onSubmit={generatePack} className='mt-10 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm'>

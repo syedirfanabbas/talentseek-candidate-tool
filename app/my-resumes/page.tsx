@@ -86,7 +86,6 @@ export default function MyResumesPage() {
   }
 
   return <main className='min-h-screen bg-slate-50 px-6 py-10'><div className='mx-auto max-w-5xl'>
-    <Link href='/dashboard' className='text-sm text-slate-500 hover:text-slate-700'>← Back to What would you like to do?</Link>
     <header className='mt-6 flex flex-wrap items-end justify-between gap-5'><div><p className='text-sm font-semibold uppercase tracking-widest text-teal-700'>Your resume library</p><h1 className='mt-3 text-3xl font-bold tracking-tight text-slate-900 sm:text-5xl'>My Resumes</h1><p className='mt-4 text-lg text-slate-600'>Your saved master resume and optimized versions are available only to your account.</p></div><Link href='/master-resume' className='rounded-xl bg-slate-900 px-4 py-3 text-sm font-semibold text-white hover:bg-slate-700'>Build master resume</Link></header>
     {error && <p role='alert' className='mt-6 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700'>{error}</p>}
     {loading ? <p className='mt-10 text-slate-500'>Loading saved resumes…</p> : <div className='mt-10 space-y-8'>

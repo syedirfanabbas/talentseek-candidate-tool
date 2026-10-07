@@ -87,7 +87,6 @@ export default function MasterResume() {
   const [isLoading, setIsLoading] = useState(false)
   const [uploadingIndex, setUploadingIndex] = useState<number | null>(null)
   const [error, setError] = useState('')
-  const [role, setRole] = useState('candidate')
   const [isSaving, setIsSaving] = useState(false)
   const [saveMessage, setSaveMessage] = useState('')
   const [savedContent, setSavedContent] = useState('') // what's stored in the account; the Save button is disabled while it matches
@@ -95,9 +94,6 @@ export default function MasterResume() {
   const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
 
   useEffect(() => {
-    supabase.auth.getUser().then(({ data }) => {
-      setRole(data.user?.app_metadata?.role || 'candidate')
-    })
     supabase.auth.getSession().then(async ({ data }) => {
       if (!data.session) return
       const response = await fetch(`${API_URL}/resume-library/master`, { headers: { Authorization: `Bearer ${data.session.access_token}` } })
@@ -250,14 +246,8 @@ export default function MasterResume() {
   return (
     <main className='min-h-screen bg-slate-50 px-6 py-10'>
       <div className='mx-auto max-w-6xl'>
-        <div className='mb-8 text-center'>
-          <h1 className='text-4xl font-bold text-slate-900'>TalentSeek</h1>
-          <p className='mt-2 text-slate-600'>Master Resume Builder</p>
-        </div>
+        <header className='mb-10 max-w-3xl'><p className='text-sm font-semibold uppercase tracking-widest text-teal-700'>Master resume</p><h1 className='mt-3 text-3xl font-bold tracking-tight text-slate-900 sm:text-5xl'>Combine your resume versions.</h1><p className='mt-4 text-lg leading-8 text-slate-600'>One complete career record to tailor from. It is not the resume you send to employers.</p></header>
 
-        <div className='mb-4'>
-          <a href={role === 'admin' ? '/admin/dashboard' : role === 'recruiter' ? '/recruiter/dashboard' : '/dashboard'} className='text-sm text-slate-500 hover:text-slate-700'>← Back to {role === 'admin' ? 'Admin Home' : role === 'recruiter' ? 'Recruiter Home' : 'What would you like to do?'}</a>
-        </div>
 
         <div className='grid gap-8 lg:grid-cols-2'>
           <section className='rounded-2xl bg-white p-6 shadow-sm'>
