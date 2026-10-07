@@ -8,6 +8,7 @@ import { saveAs } from 'file-saver'
 import jsPDF from 'jspdf'
 import { supabase } from '../../lib/supabase'
 import { apiErrorMessage } from '../../lib/apiError'
+import { withRetryAdvice } from '../../lib/retryAdvice'
 
 const MAX_RESUMES = 10
 
@@ -141,10 +142,10 @@ export default function MasterResume() {
         if (data.text) {
           setFiles(prev => [...prev, { name: file.name, text: data.text }])
         } else {
-          setError(typeof data.error === 'string' ? data.error : apiErrorMessage(data, 'Could not extract text from ' + file.name))
+          setError(withRetryAdvice(typeof data.error === 'string' ? data.error : apiErrorMessage(data, 'Could not extract text from ' + file.name)))
         }
       } catch (err) {
-        setError(err instanceof Error ? err.message : 'Upload failed')
+        setError(withRetryAdvice(err instanceof Error ? err.message : 'Upload failed'))
       }
     }
     setUploadingIndex(null)
@@ -169,7 +170,7 @@ export default function MasterResume() {
       const data = await res.json()
       setMasterResume(data.master_resume || '')
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Something went wrong')
+      setError(withRetryAdvice(err instanceof Error ? err.message : 'Something went wrong'))
     } finally { setIsLoading(false) }
   }
 
