@@ -1,6 +1,5 @@
 'use client'
 
-import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useEffect, useState } from 'react'
 import { supabase } from '../../lib/supabase'
@@ -9,11 +8,15 @@ export function AppNavigation() {
   const pathname = usePathname()
   const [signingOut, setSigningOut] = useState(false)
   const [error, setError] = useState('')
-  const [role, setRole] = useState(pathname.startsWith('/admin') ? 'admin' : pathname.startsWith('/recruiter') ? 'recruiter' : pathname.startsWith('/employer') ? 'employer' : 'candidate')
+  // Unknown until the session loads, so the menu never flashes another role's links.
+  const [role, setRole] = useState<string | null>(null)
+  const [account, setAccount] = useState('')
 
   useEffect(() => {
-    supabase.auth.getUser().then(({ data }) => {
-      setRole(data.user?.app_metadata?.role || 'candidate')
+    supabase.auth.getSession().then(({ data }) => {
+      const user = data.session?.user
+      setRole(user?.app_metadata?.role || 'candidate')
+      setAccount(user?.user_metadata?.full_name?.trim() || user?.email || '')
     })
   }, [])
 
@@ -35,7 +38,7 @@ export function AppNavigation() {
     <nav aria-label='Main navigation' className='border-b border-slate-200 bg-white px-6 py-4'>
       <div className='mx-auto flex max-w-6xl flex-wrap items-center gap-x-6 gap-y-3 text-sm'>
         <a href='https://talentseek.ca' className='font-bold text-slate-900'>TalentSeek.ca</a>
-        {(role === 'admin'
+        {role && (role === 'admin'
           ? [
               { href: '/admin/dashboard', label: 'Admin Home' },
               { href: '/admin/jobs', label: 'Job Postings' },
@@ -56,19 +59,26 @@ export function AppNavigation() {
             ]
           : [
               { href: '/dashboard', label: 'Home' },
-              { href: '/', label: 'Resume Optimizer' },
-              { href: '/master-resume', label: 'Master Resume Builder' },
+              { href: '/', label: 'Tailor My Resume' },
+              { href: '/interview-prep', label: 'Interview Prep' },
+              { href: '/my-resumes', label: 'My Resumes' },
+              { href: '/master-resume', label: 'Master Resume' },
+              { href: '/jobs', label: 'Jobs' },
               { href: '/billing', label: 'Plan & Usage' },
             ]
         ).map(({ href, label }) => (
-          <Link key={href} href={href} aria-current={pathname === href ? 'page' : undefined}
+          // Plain links: a full page load lets a page warn about unsaved work (e.g. an interview pack not yet kept).
+          <a key={href} href={href} aria-current={pathname === href ? 'page' : undefined}
             className={pathname === href ? 'font-semibold text-slate-900 underline underline-offset-4' : 'text-slate-600 hover:text-slate-900'}>
             {label}
-          </Link>
+          </a>
         ))}
-        <button onClick={signOut} disabled={signingOut} className='rounded-lg border border-slate-300 px-3 py-2 text-slate-600 hover:bg-slate-50 disabled:opacity-50 sm:ml-auto'>
-          {signingOut ? 'Signing out…' : 'Sign Out'}
-        </button>
+        <div className='flex min-w-0 items-center gap-3 sm:ml-auto'>
+          {account && <span className='max-w-[14rem] truncate text-slate-500' title={account}>{account}</span>}
+          <button onClick={signOut} disabled={signingOut} className='shrink-0 rounded-lg border border-slate-300 px-3 py-2 text-slate-600 hover:bg-slate-50 disabled:opacity-50'>
+            {signingOut ? 'Signing out…' : 'Sign Out'}
+          </button>
+        </div>
         {error && <p role='alert' className='w-full text-sm text-red-700'>{error}</p>}
       </div>
     </nav>

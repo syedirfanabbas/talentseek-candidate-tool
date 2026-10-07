@@ -81,11 +81,9 @@ export default function CandidateTool() {
   const [optimizedSaveMessage, setOptimizedSaveMessage] = useState('')
   const [optimizedSaved, setOptimizedSaved] = useState(false)
 
-  const [user, setUser] = useState<any>(null)
   const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
 
   useEffect(() => {
-    supabase.auth.getUser().then(({ data }) => setUser(data.user))
     void (async () => { const { data } = await supabase.auth.getSession(); if (data.session) { const r = await fetch(`${API_URL}/billing/me`, { headers: { Authorization: `Bearer ${data.session.access_token}` } }); if (r.ok) setFreeAllowanceGranted((await r.json()).free_allowance_granted) } })()
     const storedJobDescription = sessionStorage.getItem('talentseek-job-description')
     if (storedJobDescription) {
@@ -268,19 +266,7 @@ export default function CandidateTool() {
   return (
     <main className='min-h-screen bg-slate-50 px-6 py-10'>
       <div className='mx-auto max-w-6xl'>
-        <div className='mb-10 text-center'>
-          <h1 className='text-4xl font-bold text-slate-900'>TalentSeek</h1>
-          <p className='mt-3 text-slate-600'>AI Resume Optimization Tool</p>
-          <div className='mt-2 flex items-center justify-center gap-4 text-xs text-slate-400'>
-            {user && <span>{user.email}</span>}
-          </div>
-          <a href={user?.app_metadata?.role === 'admin' ? '/admin/dashboard' : user?.app_metadata?.role === 'recruiter' ? '/recruiter/dashboard' : '/dashboard'} className='mt-3 inline-block rounded-lg border border-slate-300 px-4 py-1.5 text-sm text-slate-600 hover:border-slate-500 hover:text-slate-900'>
-            ← {user?.app_metadata?.role === 'admin' ? 'Admin Home' : user?.app_metadata?.role === 'recruiter' ? 'Recruiter Home' : 'What would you like to do today?'}
-          </a>
-          <a href='/master-resume' className='mt-3 ml-3 inline-block rounded-lg border border-slate-300 px-4 py-1.5 text-sm text-slate-600 hover:border-slate-500 hover:text-slate-900'>
-            📋 Build Master Resume
-          </a>
-        </div>
+        <header className='mb-10 max-w-3xl'><p className='text-sm font-semibold uppercase tracking-widest text-teal-700'>Tailor my resume</p><h1 className='mt-3 text-3xl font-bold tracking-tight text-slate-900 sm:text-5xl'>Tailor your resume to a job.</h1><p className='mt-4 text-lg leading-8 text-slate-600'>Add your resume and the job ad (or a job link), and get a tailored resume with your match score.</p></header>
 
         <div className='grid gap-8 lg:grid-cols-2'>
           <section className='rounded-2xl bg-white p-6 shadow-sm'>
