@@ -9,7 +9,7 @@ const { outputText } = ts.transpileModule(fs.readFileSync(path.resolve(__dirname
 })
 const mod = { exports: {} }
 new Function('module', 'exports', 'require', outputText)(mod, mod.exports, require)
-const { recommend, isComplete } = mod.exports
+const { recommend, isComplete, isSkipped } = mod.exports
 
 const r = (has_resume, need, experience = 'early') => recommend({ has_resume, need, experience })
 
@@ -44,4 +44,12 @@ test('isComplete needs all three answers', () => {
   assert.equal(isComplete({ version: 1, has_resume: 'none', experience: 'student', need: 'job' }), true)
   assert.equal(isComplete({ version: 1, skipped_at: 'x' }), false)
   assert.equal(isComplete(null), false)
+})
+
+test('records with unknown values or versions are not trusted', () => {
+  assert.equal(isComplete({ version: 1, has_resume: 'none', experience: 'student', need: 'hack' }), false)
+  assert.equal(isComplete({ version: 2, has_resume: 'none', experience: 'student', need: 'job' }), false)
+  assert.equal(isSkipped({ version: 1, skipped_at: '2026-10-07T00:00:00Z' }), true)
+  assert.equal(isSkipped({ version: 1, skipped_at: 'x', has_resume: 'none', experience: 'student', need: 'job' }), false)
+  assert.equal(isSkipped({ skipped_at: 'x' }), false)
 })
