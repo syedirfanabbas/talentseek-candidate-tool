@@ -3,6 +3,8 @@
 import Link from 'next/link'
 import { FormEvent, useEffect, useState } from 'react'
 import { supabase } from '../../lib/supabase'
+import { GettingStarted } from '../components/GettingStarted'
+import { GettingStartedAnswers, GettingStartedRecord, isComplete, recommend } from '../../lib/gettingStarted'
 
 type Application = { id: string; company_name: string; role_title: string; job_url?: string; status: string; notes?: string }
 type RecruiterRequest = { id: string; target_role: string; notes?: string; status: string; service_type?: string | null }
@@ -53,6 +55,10 @@ export default function DashboardPage() {
   const [isLoading, setIsLoading] = useState(true)
   const [isSaving, setIsSaving] = useState(false)
   const [requests, setRequests] = useState<RecruiterRequest[]>([])
+  const [guide, setGuide] = useState<GettingStartedRecord | null | undefined>(undefined) // undefined = not loaded yet
+  const [guideOpen, setGuideOpen] = useState(false)
+  const [guideSaving, setGuideSaving] = useState(false)
+  const [guideError, setGuideError] = useState('')
   const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
 
   async function authHeaders(): Promise<Record<string, string>> {
@@ -67,6 +73,26 @@ export default function DashboardPage() {
   }
 
   useEffect(() => { void loadApplications() }, [])
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data }) => {
+      const record = (data.session?.user?.user_metadata?.getting_started as GettingStartedRecord | undefined) || null
+      setGuide(record)
+      setGuideOpen(!record)
+    })
+  }, [])
+
+  async function saveGuide(record: GettingStartedRecord) {
+    setGuideSaving(true); setGuideError('')
+    const { error } = await supabase.auth.updateUser({ data: { getting_started: record } })
+    if (error) setGuideError('We could not save your answers. Please try again.')
+    else { setGuide(record); setGuideOpen(false) }
+    setGuideSaving(false)
+  }
+  const submitGuide = (answers: GettingStartedAnswers) => saveGuide({ ...guide, ...answers, version: 1, answered_at: new Date().toISOString() })
+  const skipGuide = () => saveGuide({ ...guide, version: 1, skipped_at: new Date().toISOString() })
+  const requestFirstResume = () => guide && saveGuide({ ...guide, first_resume_early_access_at: new Date().toISOString() })
+  const recommendation = isComplete(guide) ? recommend(guide) : null
+  const orderedChoices = recommendation ? [...choices].sort((a, b) => Number(b.href === recommendation.href) - Number(a.href === recommendation.href)) : choices
   useEffect(() => { void (async () => { const response = await fetch(`${API_URL}/recruiter-requests`, { headers: await authHeaders() }); if (response.ok) setRequests(await response.json()) })() }, [])
 
   async function addApplication(event: FormEvent) {
@@ -102,9 +128,26 @@ export default function DashboardPage() {
           <p className='mt-5 text-lg leading-8 text-slate-600'>Start with your experience, prepare for a specific role, or get support from a recruiter.</p>
         </div>
 
+        {guideOpen && guide !== undefined && <GettingStarted initial={isComplete(guide) ? guide : undefined} saving={guideSaving} onSubmit={submitGuide} onSkip={skipGuide} />}
+        {guideError && <p role='alert' className='mt-4 text-sm text-red-700'>{guideError} You can still pick any option below.</p>}
+
+        {recommendation?.firstResume && !guideOpen && (
+          <section className='mt-10 rounded-2xl border border-amber-200 bg-amber-50 p-6'>
+            <h2 className='text-lg font-bold text-slate-900'>Help me build my first resume <span className='ml-2 rounded-full bg-amber-200 px-2 py-0.5 text-xs font-semibold text-amber-900'>Coming soon</span></h2>
+            <p className='mt-2 text-sm leading-6 text-slate-700'>We’re considering a guided builder for people writing their first resume. Want early access?</p>
+            {guide?.first_resume_early_access_at
+              ? <p role='status' className='mt-4 text-sm font-semibold text-emerald-800'>✓ Thanks, you’re on the early-access list. We’ll show it here when it’s ready.</p>
+              : <button type='button' onClick={requestFirstResume} disabled={guideSaving} className='mt-4 rounded-xl bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-700 disabled:opacity-50'>Yes, I want early access</button>}
+          </section>
+        )}
+
         <div className='mt-10 grid gap-6 md:grid-cols-2 xl:grid-cols-4'>
-          {choices.map(choice => (
-            <section key={choice.href} className='flex flex-col rounded-2xl border border-slate-200 bg-white p-7 shadow-sm'>
+          {orderedChoices.map(choice => {
+            const recommended = !guideOpen && recommendation?.href === choice.href
+            return (
+            <section key={choice.href} className={`flex flex-col rounded-2xl border bg-white p-7 shadow-sm ${recommended ? 'border-teal-600 ring-2 ring-teal-600' : 'border-slate-200'}`}>
+              {recommended && <p className='mb-3 self-start rounded-full bg-teal-700 px-3 py-1 text-xs font-semibold text-white'>Recommended for you</p>}
+              {recommended && <p className='mb-4 text-sm leading-6 text-teal-900'>{recommendation?.reason}</p>}
               <p className='text-xs font-semibold uppercase tracking-wider text-teal-700'>{choice.category}</p>
               <h2 className='mt-4 text-2xl font-bold text-slate-900'>{choice.title}</h2>
               <p className='mt-4 flex-1 leading-7 text-slate-600'>{choice.description}</p>
@@ -112,10 +155,16 @@ export default function DashboardPage() {
                 {choice.action}<span aria-hidden='true'>→</span>
               </Link>
             </section>
-          ))}
+            )
+          })}
         </div>
 
-        <p className='mt-8 text-sm leading-6 text-slate-500'>Not sure where to start? Build your master resume first, then tailor it for each job you apply to.</p>
+        {!guideOpen && guide !== undefined && (
+          <p className='mt-8 text-sm leading-6 text-slate-500'>
+            {recommendation ? 'Want a different suggestion? ' : 'Not sure where to start? '}
+            <button type='button' onClick={() => setGuideOpen(true)} className='font-semibold text-teal-800 underline'>{recommendation ? 'Change my answers' : 'Answer 3 quick questions'}</button>
+          </p>
+        )}
 
         <section className='mt-12 rounded-2xl border border-slate-200 bg-white p-7 shadow-sm'>
           <div className='flex flex-wrap items-start justify-between gap-4'>
