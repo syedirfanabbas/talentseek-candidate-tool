@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { GettingStartedAnswers, QUESTIONS } from '../../lib/gettingStarted'
 
 type Props = {
@@ -15,15 +15,36 @@ type Props = {
 export function GettingStarted({ initial, saving, onSubmit, onSkip }: Props) {
   const [answers, setAnswers] = useState<Partial<GettingStartedAnswers>>(initial || {})
   const [step, setStep] = useState(0)
+  const [moving, setMoving] = useState(false)
+  const timer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const heading = useRef<HTMLHeadingElement>(null)
+  const firstRender = useRef(true)
   const { key, question, options } = QUESTIONS[step]
   const last = step === QUESTIONS.length - 1
 
+  function cancelMove() {
+    if (timer.current) clearTimeout(timer.current)
+    timer.current = null
+    setMoving(false)
+  }
+  useEffect(() => cancelMove, [])
+
+  // After each step, move focus to the new question so keyboard and screen-reader users follow along.
+  useEffect(() => {
+    if (firstRender.current) { firstRender.current = false; return }
+    heading.current?.focus()
+  }, [step])
+
   function choose(value: string) {
+    if (moving || saving) return // one transition at a time: double taps can't skip a question
     const next = { ...answers, [key]: value }
     setAnswers(next)
-    if (last) onSubmit(next as GettingStartedAnswers)
-    else setTimeout(() => setStep(step + 1), 180) // let the selection show before moving on
+    if (last) { onSubmit(next as GettingStartedAnswers); return }
+    setMoving(true)
+    timer.current = setTimeout(() => { timer.current = null; setMoving(false); setStep(step + 1) }, 180) // let the selection show first
   }
+  const back = () => { cancelMove(); setStep(Math.max(0, step - 1)) }
+  const skip = () => { cancelMove(); onSkip() }
 
   return (
     <section aria-labelledby='getting-started-title' className='mt-10 overflow-hidden rounded-3xl bg-white shadow-lg ring-1 ring-slate-200'>
@@ -32,7 +53,7 @@ export function GettingStarted({ initial, saving, onSubmit, onSkip }: Props) {
           <p className='text-xs font-semibold uppercase tracking-widest text-teal-200'>Let’s find your starting point</p>
           <p className='rounded-full bg-white/10 px-3 py-1 text-xs text-teal-50'>⏱ Takes about 20 seconds</p>
         </div>
-        <h2 id='getting-started-title' className='mt-3 text-2xl font-bold sm:text-3xl'>{question}</h2>
+        <h2 id='getting-started-title' ref={heading} tabIndex={-1} aria-live='polite' className='mt-3 text-2xl font-bold outline-none sm:text-3xl'>{question}</h2>
         <div className='mt-5 flex items-center gap-3' aria-label={`Step ${step + 1} of ${QUESTIONS.length}`}>
           <div className='flex flex-1 gap-2'>
             {QUESTIONS.map((_, index) => (
@@ -60,11 +81,11 @@ export function GettingStarted({ initial, saving, onSubmit, onSkip }: Props) {
 
         <div className='mt-7 flex flex-wrap items-center justify-between gap-4 text-sm'>
           {step > 0
-            ? <button type='button' onClick={() => setStep(step - 1)} disabled={saving} className='font-medium text-slate-600 hover:text-slate-900'>← Back</button>
+            ? <button type='button' onClick={back} disabled={saving} className='font-medium text-slate-600 hover:text-slate-900'>← Back</button>
             : <span />}
           {saving
             ? <span role='status' className='font-medium text-teal-800'>Finding your starting point…</span>
-            : <button type='button' onClick={onSkip} className='font-medium text-slate-400 hover:text-slate-700'>Skip for now</button>}
+            : <button type='button' onClick={skip} className='font-medium text-slate-400 hover:text-slate-700'>Skip for now</button>}
         </div>
       </div>
     </section>

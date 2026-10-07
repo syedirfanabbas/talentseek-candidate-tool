@@ -1,10 +1,10 @@
 'use client'
 
 import Link from 'next/link'
-import { FormEvent, useEffect, useState } from 'react'
+import { FormEvent, useEffect, useRef, useState } from 'react'
 import { supabase } from '../../lib/supabase'
 import { GettingStarted } from '../components/GettingStarted'
-import { GettingStartedAnswers, GettingStartedRecord, isComplete, recommend } from '../../lib/gettingStarted'
+import { GettingStartedAnswers, GettingStartedRecord, isComplete, isSkipped, recommend } from '../../lib/gettingStarted'
 
 type Application = { id: string; company_name: string; role_title: string; job_url?: string; status: string; notes?: string }
 type RecruiterRequest = { id: string; target_role: string; notes?: string; status: string; service_type?: string | null }
@@ -59,6 +59,9 @@ export default function DashboardPage() {
   const [guideOpen, setGuideOpen] = useState(false)
   const [guideSaving, setGuideSaving] = useState(false)
   const [guideError, setGuideError] = useState('')
+  const [guideEligible, setGuideEligible] = useState(false) // candidates only: staff answers would skew the D16 evidence
+  const startingPoint = useRef<HTMLHeadingElement>(null)
+  const [justAnswered, setJustAnswered] = useState(false)
   const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
 
   async function authHeaders(): Promise<Record<string, string>> {
@@ -75,9 +78,12 @@ export default function DashboardPage() {
   useEffect(() => { void loadApplications() }, [])
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => {
-      const record = (data.session?.user?.user_metadata?.getting_started as GettingStartedRecord | undefined) || null
+      const user = data.session?.user
+      const record = (user?.user_metadata?.getting_started as GettingStartedRecord | undefined) || null
+      const eligible = (user?.app_metadata?.role || 'candidate') === 'candidate'
+      setGuideEligible(eligible)
       setGuide(record)
-      setGuideOpen(!record)
+      setGuideOpen(eligible && !isComplete(record) && !isSkipped(record))
     })
   }, [])
 
@@ -85,13 +91,15 @@ export default function DashboardPage() {
     setGuideSaving(true); setGuideError('')
     const { error } = await supabase.auth.updateUser({ data: { getting_started: record } })
     if (error) setGuideError('We could not save your answers. Please try again.')
-    else { setGuide(record); setGuideOpen(false) }
+    else { setGuide(record); setGuideOpen(false); setJustAnswered(isComplete(record)) }
     setGuideSaving(false)
   }
   const submitGuide = (answers: GettingStartedAnswers) => saveGuide({ ...guide, ...answers, version: 1, answered_at: new Date().toISOString() })
   const skipGuide = () => saveGuide({ ...guide, version: 1, skipped_at: new Date().toISOString() })
   const requestFirstResume = () => guide && saveGuide({ ...guide, first_resume_early_access_at: new Date().toISOString() })
-  const recommendation = isComplete(guide) ? recommend(guide) : null
+  const recommendation = guideEligible && isComplete(guide) ? recommend(guide) : null
+  // After the last answer, move focus to the result so keyboard and screen-reader users land on it.
+  useEffect(() => { if (justAnswered) { startingPoint.current?.focus(); setJustAnswered(false) } }, [justAnswered])
   const orderedChoices = recommendation ? [...choices].sort((a, b) => Number(b.href === recommendation.href) - Number(a.href === recommendation.href)) : choices
   useEffect(() => { void (async () => { const response = await fetch(`${API_URL}/recruiter-requests`, { headers: await authHeaders() }); if (response.ok) setRequests(await response.json()) })() }, [])
 
@@ -128,7 +136,7 @@ export default function DashboardPage() {
           <p className='mt-5 text-lg leading-8 text-slate-600'>Start with your experience, prepare for a specific role, or get support from a recruiter.</p>
         </div>
 
-        {guideOpen && guide !== undefined && <GettingStarted initial={isComplete(guide) ? guide : undefined} saving={guideSaving} onSubmit={submitGuide} onSkip={skipGuide} />}
+        {guideOpen && guideEligible && guide !== undefined && <GettingStarted initial={isComplete(guide) ? guide : undefined} saving={guideSaving} onSubmit={submitGuide} onSkip={skipGuide} />}
         {guideError && <p role='alert' className='mt-4 text-sm text-red-700'>{guideError} You can still pick any option below.</p>}
 
         {recommendation && !guideOpen && (() => {
@@ -136,7 +144,7 @@ export default function DashboardPage() {
           return start && (
             <section aria-labelledby='starting-point-title' className='mt-10 animate-[fadeIn_300ms_ease-out] overflow-hidden rounded-3xl bg-gradient-to-br from-slate-900 via-slate-800 to-teal-800 p-6 text-white shadow-lg sm:p-9'>
               <p className='text-xs font-semibold uppercase tracking-widest text-teal-200'>✨ Your starting point</p>
-              <h2 id='starting-point-title' className='mt-3 text-2xl font-bold sm:text-4xl'>{start.title}</h2>
+              <h2 id='starting-point-title' ref={startingPoint} tabIndex={-1} className='mt-3 text-2xl font-bold outline-none sm:text-4xl'>{start.title}</h2>
               <p className='mt-3 max-w-2xl text-base leading-7 text-slate-200'>{recommendation.reason}</p>
               <div className='mt-6 flex flex-wrap items-center gap-4'>
                 <Link href={start.href} className='inline-flex items-center gap-3 rounded-xl bg-teal-400 px-5 py-3 text-sm font-bold text-slate-900 shadow hover:bg-teal-300'>{start.action}<span aria-hidden='true'>→</span></Link>
@@ -148,11 +156,11 @@ export default function DashboardPage() {
 
         {recommendation?.firstResume && !guideOpen && (
           <section className='mt-10 rounded-2xl border border-amber-200 bg-amber-50 p-6'>
-            <h2 className='text-lg font-bold text-slate-900'>Help me build my first resume <span className='ml-2 rounded-full bg-amber-200 px-2 py-0.5 text-xs font-semibold text-amber-900'>Coming soon</span></h2>
-            <p className='mt-2 text-sm leading-6 text-slate-700'>We’re considering a guided builder for people writing their first resume. Want early access?</p>
+            <h2 className='text-lg font-bold text-slate-900'>Help me build my first resume <span className='ml-2 rounded-full bg-amber-200 px-2 py-0.5 text-xs font-semibold text-amber-900'>Under consideration</span></h2>
+            <p className='mt-2 text-sm leading-6 text-slate-700'>We’re considering a guided builder for people writing their first resume. Would you use it? Register your interest.</p>
             {guide?.first_resume_early_access_at
-              ? <p role='status' className='mt-4 text-sm font-semibold text-emerald-800'>✓ Thanks, you’re on the early-access list. We’ll show it here when it’s ready.</p>
-              : <button type='button' onClick={requestFirstResume} disabled={guideSaving} className='mt-4 rounded-xl bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-700 disabled:opacity-50'>Yes, I want early access</button>}
+              ? <p role='status' className='mt-4 text-sm font-semibold text-emerald-800'>✓ Thanks, your interest has been recorded.</p>
+              : <button type='button' onClick={requestFirstResume} disabled={guideSaving} className='mt-4 rounded-xl bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-700 disabled:opacity-50'>Register my interest</button>}
           </section>
         )}
 
@@ -173,7 +181,7 @@ export default function DashboardPage() {
           })}
         </div>
 
-        {!guideOpen && guide !== undefined && (
+        {!guideOpen && guideEligible && guide !== undefined && (
           <p className='mt-8 text-sm leading-6 text-slate-500'>
             {recommendation ? 'Want a different suggestion? ' : 'Not sure where to start? '}
             <button type='button' onClick={() => setGuideOpen(true)} className='font-semibold text-teal-800 underline'>{recommendation ? 'Change my answers' : 'Answer 3 quick questions'}</button>

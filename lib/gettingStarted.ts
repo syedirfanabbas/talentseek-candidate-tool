@@ -33,7 +33,7 @@ export const QUESTIONS = [
 // First matching rule wins. Experience does not change the route yet (it is evidence for D16).
 export function recommend(answers: GettingStartedAnswers): Recommendation {
   if (answers.has_resume === 'none')
-    return { href: '/interview-prep', reason: 'Interview packs work without a resume. A guided first-resume builder is coming soon.', firstResume: true }
+    return { href: '/interview-prep', reason: 'Interview packs work without a resume. We’re also considering a guided first-resume builder.', firstResume: true }
   if (answers.has_resume === 'several' && answers.need !== 'interview' && answers.need !== 'recruiter')
     return { href: '/master-resume', reason: 'Combine your versions once, then tailor from your master resume for each job.' }
   if (answers.need === 'interview') return { href: '/interview-prep', reason: 'Get likely questions and a preparation plan for your interview.' }
@@ -43,6 +43,14 @@ export function recommend(answers: GettingStartedAnswers): Recommendation {
   return { href: '/', reason: 'You get the best results with the job ad or a job link.' }
 }
 
+const allowed = (key: keyof GettingStartedAnswers, value: unknown) =>
+  QUESTIONS.find(question => question.key === key)!.options.some(option => option.value === value)
+
+// user_metadata is user-editable: only trust records with known values (anything else shows the questions again).
 export function isComplete(record: GettingStartedRecord | null | undefined): record is GettingStartedRecord & GettingStartedAnswers {
-  return Boolean(record?.has_resume && record?.experience && record?.need)
+  return record?.version === 1 && allowed('has_resume', record.has_resume) && allowed('experience', record.experience) && allowed('need', record.need)
+}
+
+export function isSkipped(record: GettingStartedRecord | null | undefined): boolean {
+  return record?.version === 1 && typeof record.skipped_at === 'string' && !isComplete(record)
 }
