@@ -1,9 +1,8 @@
 // Export an interview-preparation pack as plain text or branded PDF.
-// Generated packs are also automatically saved to the account library.
+// Packs are not stored on our servers, so these are how a candidate keeps one.
 import { BrandedReportPdf } from './reportPdf'
 
 export type InterviewPack = {
-  saved_pack_id?: string
   match_confidence: { score: number; label: string; summary: string }
   role_summary: string
   skills_to_demonstrate: string[]
