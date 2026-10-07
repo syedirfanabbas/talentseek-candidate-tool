@@ -12,21 +12,21 @@ export type Recommendation = { href: string; reason: string; firstResume?: boole
 
 export const QUESTIONS = [
   { key: 'has_resume', question: 'Do you have a resume right now?', options: [
-    { value: 'current', label: 'Yes, and it’s fairly up to date' },
-    { value: 'several', label: 'Yes, but I have several versions' },
-    { value: 'old', label: 'Yes, but it’s old or needs work' },
-    { value: 'none', label: 'No, not yet' },
+    { value: 'current', icon: '📄', label: 'Yes, and it’s fairly up to date' },
+    { value: 'several', icon: '🗂️', label: 'Yes, but I have several versions' },
+    { value: 'old', icon: '🕰️', label: 'Yes, but it’s old or needs work' },
+    { value: 'none', icon: '✏️', label: 'No, not yet' },
   ] },
   { key: 'experience', question: 'How much work experience do you have?', options: [
-    { value: 'student', label: 'Student or new graduate' },
-    { value: 'early', label: '1–5 years' },
-    { value: 'experienced', label: 'More than 5 years' },
+    { value: 'student', icon: '🎓', label: 'Student or new graduate' },
+    { value: 'early', icon: '🌱', label: '1–5 years' },
+    { value: 'experienced', icon: '🏆', label: 'More than 5 years' },
   ] },
   { key: 'need', question: 'What do you need most right now?', options: [
-    { value: 'job', label: 'Apply to a specific job' },
-    { value: 'interview', label: 'Prepare for an interview' },
-    { value: 'improve', label: 'Improve my resume in general' },
-    { value: 'recruiter', label: 'Talk to a recruiter' },
+    { value: 'job', icon: '🎯', label: 'Apply to a specific job' },
+    { value: 'interview', icon: '🎤', label: 'Prepare for an interview' },
+    { value: 'improve', icon: '✨', label: 'Improve my resume in general' },
+    { value: 'recruiter', icon: '🤝', label: 'Talk to a recruiter' },
   ] },
 ] as const
 

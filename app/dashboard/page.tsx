@@ -131,6 +131,21 @@ export default function DashboardPage() {
         {guideOpen && guide !== undefined && <GettingStarted initial={isComplete(guide) ? guide : undefined} saving={guideSaving} onSubmit={submitGuide} onSkip={skipGuide} />}
         {guideError && <p role='alert' className='mt-4 text-sm text-red-700'>{guideError} You can still pick any option below.</p>}
 
+        {recommendation && !guideOpen && (() => {
+          const start = choices.find(choice => choice.href === recommendation.href)
+          return start && (
+            <section aria-labelledby='starting-point-title' className='mt-10 animate-[fadeIn_300ms_ease-out] overflow-hidden rounded-3xl bg-gradient-to-br from-slate-900 via-slate-800 to-teal-800 p-6 text-white shadow-lg sm:p-9'>
+              <p className='text-xs font-semibold uppercase tracking-widest text-teal-200'>✨ Your starting point</p>
+              <h2 id='starting-point-title' className='mt-3 text-2xl font-bold sm:text-4xl'>{start.title}</h2>
+              <p className='mt-3 max-w-2xl text-base leading-7 text-slate-200'>{recommendation.reason}</p>
+              <div className='mt-6 flex flex-wrap items-center gap-4'>
+                <Link href={start.href} className='inline-flex items-center gap-3 rounded-xl bg-teal-400 px-5 py-3 text-sm font-bold text-slate-900 shadow hover:bg-teal-300'>{start.action}<span aria-hidden='true'>→</span></Link>
+                <button type='button' onClick={() => setGuideOpen(true)} className='text-sm font-medium text-teal-100 underline-offset-4 hover:underline'>Change my answers</button>
+              </div>
+            </section>
+          )
+        })()}
+
         {recommendation?.firstResume && !guideOpen && (
           <section className='mt-10 rounded-2xl border border-amber-200 bg-amber-50 p-6'>
             <h2 className='text-lg font-bold text-slate-900'>Help me build my first resume <span className='ml-2 rounded-full bg-amber-200 px-2 py-0.5 text-xs font-semibold text-amber-900'>Coming soon</span></h2>
@@ -147,7 +162,6 @@ export default function DashboardPage() {
             return (
             <section key={choice.href} className={`flex flex-col rounded-2xl border bg-white p-7 shadow-sm ${recommended ? 'border-teal-600 ring-2 ring-teal-600' : 'border-slate-200'}`}>
               {recommended && <p className='mb-3 self-start rounded-full bg-teal-700 px-3 py-1 text-xs font-semibold text-white'>Recommended for you</p>}
-              {recommended && <p className='mb-4 text-sm leading-6 text-teal-900'>{recommendation?.reason}</p>}
               <p className='text-xs font-semibold uppercase tracking-wider text-teal-700'>{choice.category}</p>
               <h2 className='mt-4 text-2xl font-bold text-slate-900'>{choice.title}</h2>
               <p className='mt-4 flex-1 leading-7 text-slate-600'>{choice.description}</p>
