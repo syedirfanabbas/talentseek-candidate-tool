@@ -147,13 +147,13 @@ export default function DashboardPage() {
               <h2 id='starting-point-title' ref={startingPoint} tabIndex={-1} className='mt-3 text-2xl font-bold outline-none sm:text-4xl'>{recommendation.firstResume ? 'Getting started without a resume' : start.title}</h2>
               <p className='mt-3 max-w-2xl text-base leading-7 text-slate-200'>{recommendation.reason}</p>
               <div className='mt-6 flex flex-wrap items-center gap-4'>
-                <Link href={start.href} className='inline-flex items-center gap-3 rounded-xl bg-teal-400 px-5 py-3 text-sm font-bold text-slate-900 shadow hover:bg-teal-300'>{recommendation.firstResume ? 'Talk to a recruiter' : start.action}<span aria-hidden='true'>→</span></Link>
+                <Link href={recommendation.destination || start.href} className='inline-flex items-center gap-3 rounded-xl bg-teal-400 px-5 py-3 text-sm font-bold text-slate-900 shadow hover:bg-teal-300'>{recommendation.firstResume ? 'Talk to a recruiter' : start.action}<span aria-hidden='true'>→</span></Link>
                 {recommendation.firstResume && (guide?.first_resume_early_access_at
                   ? <p role='status' className='text-sm font-semibold text-teal-100'>✓ Thanks, your interest in a resume builder has been recorded.</p>
                   : <button type='button' onClick={requestFirstResume} disabled={guideSaving} className='rounded-xl border border-white/40 px-5 py-3 text-sm font-semibold text-white hover:bg-white/10 disabled:opacity-50'>I’d use a guided resume builder: register my interest</button>)}
                 <button type='button' onClick={() => setGuideOpen(true)} className='text-sm font-medium text-teal-100 underline-offset-4 hover:underline'>Change my answers</button>
               </div>
-              {recommendation.skip && <a href={recommendation.skip.href} className='mt-4 inline-flex items-center gap-2 rounded-xl border border-white/40 px-5 py-3 text-sm font-semibold text-white hover:bg-white/10'>{recommendation.skip.label}<span aria-hidden='true'>→</span></a>}
+              {recommendation.skip && <><a href={recommendation.skip.href} className='mt-4 inline-flex items-center gap-2 rounded-xl border border-white/40 px-5 py-3 text-sm font-semibold text-white hover:bg-white/10'>{recommendation.skip.label}<span aria-hidden='true'>→</span></a><p className='mt-2 text-sm text-slate-200'>You can also paste recent details straight into your resume in Tailor My Resume.</p></>}
             </section>
           )
         })()}
@@ -168,7 +168,7 @@ export default function DashboardPage() {
               <p className='text-xs font-semibold uppercase tracking-wider text-teal-700'>{choice.category}</p>
               <h2 className='mt-4 text-2xl font-bold text-slate-900'>{choice.title}</h2>
               <p className='mt-4 flex-1 leading-7 text-slate-600'>{choice.description}</p>
-              <Link href={choice.href} className='mt-8 inline-flex items-center justify-between gap-3 rounded-xl bg-slate-900 px-4 py-3 text-sm font-semibold text-white hover:bg-slate-700 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-teal-700'>
+              <Link href={recommended ? recommendation?.destination || choice.href : choice.href} className='mt-8 inline-flex items-center justify-between gap-3 rounded-xl bg-slate-900 px-4 py-3 text-sm font-semibold text-white hover:bg-slate-700 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-teal-700'>
                 {choice.action}<span aria-hidden='true'>→</span>
               </Link>
             </section>
