@@ -8,7 +8,7 @@ export type Need = 'job' | 'interview' | 'improve' | 'recruiter'
 export type GettingStartedAnswers = { has_resume: HasResume; experience: Experience; need: Need }
 export type GettingStartedRecord = Partial<GettingStartedAnswers> & { version: 1; answered_at?: string; skipped_at?: string; first_resume_early_access_at?: string }
 
-export type Recommendation = { href: string; reason: string; firstResume?: boolean; skip?: { href: string; label: string } }
+export type Recommendation = { href: string; destination?: string; reason: string; firstResume?: boolean; skip?: { href: string; label: string } }
 
 export const QUESTIONS = [
   { key: 'has_resume', question: 'Do you have a resume right now?', options: [
@@ -37,6 +37,10 @@ export function recommend(answers: GettingStartedAnswers): Recommendation {
       reason: 'Talk to an experienced recruiter about getting started, or tell us you’d use a guided first-resume builder (under consideration).' }
   if (answers.has_resume === 'several' && answers.need !== 'interview' && answers.need !== 'recruiter')
     return { href: '/master-resume', reason: 'Combine your different resume versions into one master resume, then tailor it for each job.',
+      skip: { href: '/', label: 'Skip: go directly to Tailor My Resume with an existing resume (no master resume needed)' } }
+  if (answers.has_resume === 'old' && (answers.need === 'job' || answers.need === 'improve'))
+    return { href: '/master-resume', destination: '/master-resume?start=update',
+      reason: 'Add your recent experience to your old resume, review your master resume, then tailor it to a job.',
       skip: { href: '/', label: 'Skip: go directly to Tailor My Resume with an existing resume (no master resume needed)' } }
   if (answers.need === 'interview') return { href: '/interview-prep', reason: 'Get likely questions and a preparation plan for your interview.' }
   if (answers.need === 'recruiter') return { href: '/billing#recruiter-support', reason: 'Book a written review or a 30-minute session with an experienced recruiter.' }

@@ -30,7 +30,7 @@ test('several versions → master resume, unless the need is an interview or a r
 })
 
 test('one resume routes by need', () => {
-  for (const has of ['current', 'old']) {
+  for (const has of ['current']) {
     assert.equal(r(has, 'job').href, '/')
     assert.equal(r(has, 'improve').href, '/')
     assert.equal(r(has, 'interview').href, '/interview-prep')
@@ -54,4 +54,19 @@ test('records with unknown values or versions are not trusted', () => {
   assert.equal(isSkipped({ version: 1, skipped_at: '2026-10-07T00:00:00Z' }), true)
   assert.equal(isSkipped({ version: 1, skipped_at: 'x', has_resume: 'none', experience: 'student', need: 'job' }), false)
   assert.equal(isSkipped({ skipped_at: 'x' }), false)
+})
+
+
+test('old resume routes to update flow with stable master card identity and a direct skip', () => {
+  for (const experience of ['student', 'early', 'experienced']) {
+    for (const need of ['job', 'improve']) {
+      const result = r('old', need, experience)
+      assert.equal(result.href, '/master-resume')
+      assert.equal(result.destination, '/master-resume?start=update')
+      assert.deepEqual(result.skip, r('several', need).skip)
+    }
+    assert.equal(r('old', 'interview', experience).href, '/interview-prep')
+    assert.equal(r('old', 'recruiter', experience).href, '/billing#recruiter-support')
+    assert.equal(r('old', 'interview', experience).destination, undefined)
+  }
 })

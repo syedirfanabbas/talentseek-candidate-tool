@@ -1,6 +1,8 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { MasterResumeUpdates } from '../components/MasterResumeUpdates'
+import { consolidationInputs, MAX_MASTER_INPUTS } from '../../lib/masterResumeInputs'
 import { LoadingSpinner } from '../components/LoadingSpinner'
 import { AiProcessingNotice } from '../components/AiProcessingNotice'
 import { Document, Packer, Paragraph, TextRun, BorderStyle } from 'docx'
@@ -10,7 +12,7 @@ import { supabase } from '../../lib/supabase'
 import { apiErrorMessage } from '../../lib/apiError'
 import { withRetryAdvice } from '../../lib/retryAdvice'
 
-const MAX_RESUMES = 10
+const MAX_RESUMES = MAX_MASTER_INPUTS
 
 function classifyLine(line: string, lineIndex: number, allLines: string[]): {
   type: 'name' | 'contact' | 'section' | 'job-date' | 'bullet' | 'skills' | 'empty' | 'text'
@@ -83,6 +85,9 @@ async function errorMessage(res: Response, fallback: string): Promise<string> { 
 
 export default function MasterResume() {
   const [files, setFiles] = useState<{ name: string; text: string }[]>([])
+  const [updates, setUpdates] = useState('')
+  const [updateFlow, setUpdateFlow] = useState(false)
+  const validation = consolidationInputs(files, updates)
   const [masterResume, setMasterResume] = useState('')
   const [isLoading, setIsLoading] = useState(false)
   const [uploadingIndex, setUploadingIndex] = useState<number | null>(null)
@@ -94,6 +99,7 @@ export default function MasterResume() {
   const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
 
   useEffect(() => {
+    setUpdateFlow(new URLSearchParams(window.location.search).get('start') === 'update')
     supabase.auth.getSession().then(async ({ data }) => {
       if (!data.session) return
       const response = await fetch(`${API_URL}/resume-library/master`, { headers: { Authorization: `Bearer ${data.session.access_token}` } })
@@ -116,8 +122,8 @@ export default function MasterResume() {
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const selected = Array.from(e.target.files || [])
-    if (files.length + selected.length > MAX_RESUMES) {
-      setError(`Maximum ${MAX_RESUMES} resumes allowed`)
+    if (files.length + selected.length + (updates.trim() ? 1 : 0) > MAX_RESUMES) {
+      setError('Use at most 10 inputs in total; your typed update counts as one input.')
       return
     }
     setError('')
@@ -153,26 +159,27 @@ export default function MasterResume() {
   }
 
   const handleConsolidate = async () => {
-    if (files.length < 2) { setError('Please upload at least 2 resumes to consolidate'); return }
+    if (validation.error) { setError(validation.error); return }
     setIsLoading(true); setError(''); setMasterResume('')
     try {
       const authHeaders = await getAuthHeaders()
       const res = await fetch(`${API_URL}/resumes/consolidate-demo`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', ...authHeaders },
-        body: JSON.stringify({ resumes: files.map(f => f.text) }),
+        body: JSON.stringify({ resumes: validation.inputs }),
       })
       if (!res.ok) throw new Error(await errorMessage(res, 'Consolidation failed'))
       const data = await res.json()
-      setMasterResume(data.master_resume || '')
+      if (!data.master_resume?.trim()) throw new Error('We could not build your master resume. Please try again.')
+      setMasterResume(data.master_resume)
     } catch (err) {
       setError(withRetryAdvice(err instanceof Error ? err.message : 'Something went wrong'))
     } finally { setIsLoading(false) }
   }
 
   const saveMasterResume = async () => {
-    if (!masterResume.trim()) return
-    setIsSaving(true); setSaveMessage('')
+    if (!masterResume.trim()) return false
+    setIsSaving(true); setSaveMessage(''); setError('')
     try {
       const response = await fetch(`${API_URL}/resume-library/master`, {
         method: 'PUT', headers: { 'Content-Type': 'application/json', ...await getAuthHeaders() },
@@ -181,8 +188,14 @@ export default function MasterResume() {
       if (!response.ok) throw new Error('Unable to save your master resume.')
       setSavedContent(masterResume)
       setSaveMessage('Master resume saved securely to your account.')
-    } catch (saveError) { setSaveMessage(saveError instanceof Error ? saveError.message : 'Unable to save your master resume.') }
-    setIsSaving(false)
+      return true
+    } catch (saveError) { setError(saveError instanceof Error ? saveError.message : 'Unable to save your master resume.'); return false }
+    finally { setIsSaving(false) }
+  }
+
+  const tailorMasterResume = async () => {
+    if (masterResume !== savedContent && !await saveMasterResume()) return
+    window.location.assign('/')
   }
 
   const downloadDocx = async () => {
@@ -246,13 +259,13 @@ export default function MasterResume() {
   return (
     <main className='min-h-screen bg-slate-50 px-6 py-10'>
       <div className='mx-auto max-w-6xl'>
-        <header className='mb-10 max-w-3xl'><p className='text-sm font-semibold uppercase tracking-widest text-teal-700'>Master resume</p><h1 className='mt-3 text-3xl font-bold tracking-tight text-slate-900 sm:text-5xl'>Combine your resume versions.</h1><p className='mt-4 text-lg leading-8 text-slate-600'>One complete career record to tailor from. It is not the resume you send to employers.</p></header>
+        <header className='mb-10 max-w-3xl'><p className='text-sm font-semibold uppercase tracking-widest text-teal-700'>Master resume</p><h1 className='mt-3 text-3xl font-bold tracking-tight text-slate-900 sm:text-5xl'>Build or update your master resume.</h1><p className='mt-4 text-lg leading-8 text-slate-600'>One complete career record to tailor from. It is not the resume you send to employers.</p></header>
 
 
         <div className='grid gap-8 lg:grid-cols-2'>
           <section className='rounded-2xl bg-white p-6 shadow-sm'>
             <h2 className='mb-1 text-xl font-semibold text-slate-900'>Upload Your Resumes</h2>
-            <p className='mb-4 text-sm text-slate-500'>A master resume is your complete career record, built from all your old resume versions. It is not the resume you send to employers: use it as the starting point when you tailor a resume to a job. Select 2 or more versions at once (up to {MAX_RESUMES}); the more you add, the more complete it is.</p>
+            <p className='mb-4 text-sm text-slate-500'>A master resume is your complete career record, built from all your old resume versions. It is not the resume you send to employers: use it as the starting point when you tailor a resume to a job. Upload 2 or more versions, or one resume plus what’s new below (up to {MAX_RESUMES} inputs in total).</p>
 
             {files.length < MAX_RESUMES && (
               <label className='mb-4 flex cursor-pointer flex-col items-center gap-2 rounded-xl border-2 border-dashed border-slate-300 px-4 py-6 text-slate-500 hover:border-slate-400'>
@@ -265,7 +278,7 @@ export default function MasterResume() {
                   multiple
                   className='hidden'
                   onChange={handleFileUpload}
-                  disabled={uploadingIndex !== null}
+                  disabled={uploadingIndex !== null || isLoading}
                 />
               </label>
             )}
@@ -290,7 +303,7 @@ export default function MasterResume() {
                       </div>
                     </div>
                     <button onClick={() => removeFile(i)}
-                      className='text-slate-400 hover:text-red-500 text-lg leading-none'>×</button>
+                      aria-label={`Remove ${file.name}`} disabled={isLoading} className='text-slate-400 hover:text-red-500 text-lg leading-none'>×</button>
                   </div>
                 ))}
               </div>
@@ -302,18 +315,18 @@ export default function MasterResume() {
               </div>
             )}
 
+            <MasterResumeUpdates value={updates} onChange={setUpdates} updateFlow={updateFlow} disabled={isLoading} />
+            <p className='mb-4 text-sm text-slate-700'>Designed to work from your experience: you review everything before you use it.</p>
             <button
               onClick={handleConsolidate}
-              disabled={isLoading || files.length < 2}
+              disabled={isLoading || uploadingIndex !== null || Boolean(validation.error)}
               className='w-full rounded-xl bg-slate-900 px-5 py-3 text-white disabled:opacity-40'>
-              {isLoading ? 'Working...' : `✨ Build Master Resume (${files.length} files)`}
+              {isLoading ? 'Working...' : `✨ Build Master Resume (${validation.inputs.length} inputs)`}
             </button>
 
-            {files.length < 2 && files.length > 0 && (
-              <p className='mt-2 text-center text-xs text-slate-400'>Upload at least one more resume to continue</p>
-            )}
+            {validation.error && <p role='status' aria-live='polite' className='mt-2 text-sm text-slate-600'>{validation.error}</p>}
 
-            {error && <div className='mt-4 rounded-xl bg-red-50 p-4 text-sm text-red-700'>{error}</div>}
+            {error && <div role='alert' className='mt-4 rounded-xl bg-red-50 p-4 text-sm text-red-700'>{error}</div>}
           </section>
 
           <section className='rounded-2xl bg-white p-6 shadow-sm'>
@@ -322,24 +335,26 @@ export default function MasterResume() {
             {!masterResume && !isLoading && (
               <div className='rounded-xl border border-dashed border-slate-300 p-8 text-center text-slate-500'>
                 <p className='text-4xl mb-3'>📋</p>
-                <p className='text-sm'>Upload several resume versions and click Build Master Resume. The AI merges them into one complete record of your experience.</p>
+                <p className='text-sm'>Upload resume versions, or one resume and your recent updates, then click Build Master Resume. The AI merges them into one complete record of your experience.</p>
               </div>
             )}
 
             {isLoading && (
               <div className='flex flex-col items-center gap-3 py-12'>
                 <LoadingSpinner />
-                <p className='text-sm text-slate-500'>World-leading AI is building your master resume...</p>
-                <p className='text-xs text-slate-400'>Analysing, merging, and perfecting your career story — this may take 20-30 seconds</p>
+                <p className='text-sm text-slate-500'>Building your master resume…</p>
+                <p className='text-xs text-slate-400'>Combining your experience and updates. This may take about a minute.</p>
               </div>
             )}
 
             {masterResume && (
               <div>
                 <p className='mb-3 rounded-lg bg-blue-50 px-3 py-2 text-sm text-blue-800'>
-                  Save it to your account, then <a href='/' className='font-semibold underline'>tailor it to a job</a> (choose &quot;Master resume&quot; under &quot;Use a saved resume&quot;) to get a resume you can send.
+                  Review it, then use Next to save it and tailor it to a job (choose &quot;Master resume&quot; under &quot;Use a saved resume&quot;) to get a resume you can send.
                 </p>
-                <div className='mb-3 flex items-center justify-between'>
+                <button onClick={() => void tailorMasterResume()} disabled={isSaving} className='mb-4 rounded-xl bg-teal-700 px-4 py-3 text-sm font-semibold text-white disabled:opacity-50'>Next: tailor it to a job</button>
+                <p className='mb-4 text-sm text-slate-600'>This saves your master resume first. In Tailor My Resume, choose Master resume under Use a saved resume.</p>
+                <div className='mb-3 flex flex-wrap items-center justify-between gap-3'>
                   <h3 className='font-semibold text-slate-800'>Your Master Resume</h3>
                   <div className='flex gap-2'>
                     <button onClick={saveMasterResume} disabled={isSaving || masterResume === savedContent}
