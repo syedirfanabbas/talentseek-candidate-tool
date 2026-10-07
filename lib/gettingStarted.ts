@@ -8,7 +8,7 @@ export type Need = 'job' | 'interview' | 'improve' | 'recruiter'
 export type GettingStartedAnswers = { has_resume: HasResume; experience: Experience; need: Need }
 export type GettingStartedRecord = Partial<GettingStartedAnswers> & { version: 1; answered_at?: string; skipped_at?: string; first_resume_early_access_at?: string }
 
-export type Recommendation = { href: string; reason: string; firstResume?: boolean }
+export type Recommendation = { href: string; reason: string; firstResume?: boolean; skip?: { href: string; label: string } }
 
 export const QUESTIONS = [
   { key: 'has_resume', question: 'Do you have a resume right now?', options: [
@@ -33,9 +33,11 @@ export const QUESTIONS = [
 // First matching rule wins. Experience does not change the route yet (it is evidence for D16).
 export function recommend(answers: GettingStartedAnswers): Recommendation {
   if (answers.has_resume === 'none')
-    return { href: '/interview-prep', reason: 'Interview packs work without a resume. We’re also considering a guided first-resume builder.', firstResume: true }
+    return { href: '/billing#recruiter-support', firstResume: true,
+      reason: 'Talk to an experienced recruiter about getting started, or tell us you’d use a guided first-resume builder (under consideration).' }
   if (answers.has_resume === 'several' && answers.need !== 'interview' && answers.need !== 'recruiter')
-    return { href: '/master-resume', reason: 'Combine your versions once, then tailor from your master resume for each job.' }
+    return { href: '/master-resume', reason: 'Combine your different resume versions into one master resume, then tailor it for each job.',
+      skip: { href: '/', label: 'Skip: go directly to Tailor My Resume with an existing resume (no master resume needed)' } }
   if (answers.need === 'interview') return { href: '/interview-prep', reason: 'Get likely questions and a preparation plan for your interview.' }
   if (answers.need === 'recruiter') return { href: '/billing#recruiter-support', reason: 'Book a written review or a 30-minute session with an experienced recruiter.' }
   if (answers.need === 'improve')

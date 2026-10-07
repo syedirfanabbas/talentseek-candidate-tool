@@ -144,25 +144,20 @@ export default function DashboardPage() {
           return start && (
             <section aria-labelledby='starting-point-title' className='mt-10 animate-[fadeIn_300ms_ease-out] overflow-hidden rounded-3xl bg-gradient-to-br from-slate-900 via-slate-800 to-teal-800 p-6 text-white shadow-lg sm:p-9'>
               <p className='text-xs font-semibold uppercase tracking-widest text-teal-200'>✨ Your starting point</p>
-              <h2 id='starting-point-title' ref={startingPoint} tabIndex={-1} className='mt-3 text-2xl font-bold outline-none sm:text-4xl'>{start.title}</h2>
+              <h2 id='starting-point-title' ref={startingPoint} tabIndex={-1} className='mt-3 text-2xl font-bold outline-none sm:text-4xl'>{recommendation.firstResume ? 'Getting started without a resume' : start.title}</h2>
               <p className='mt-3 max-w-2xl text-base leading-7 text-slate-200'>{recommendation.reason}</p>
               <div className='mt-6 flex flex-wrap items-center gap-4'>
-                <Link href={start.href} className='inline-flex items-center gap-3 rounded-xl bg-teal-400 px-5 py-3 text-sm font-bold text-slate-900 shadow hover:bg-teal-300'>{start.action}<span aria-hidden='true'>→</span></Link>
+                <Link href={start.href} className='inline-flex items-center gap-3 rounded-xl bg-teal-400 px-5 py-3 text-sm font-bold text-slate-900 shadow hover:bg-teal-300'>{recommendation.firstResume ? 'Talk to a recruiter' : start.action}<span aria-hidden='true'>→</span></Link>
+                {recommendation.firstResume && (guide?.first_resume_early_access_at
+                  ? <p role='status' className='text-sm font-semibold text-teal-100'>✓ Thanks, your interest in a resume builder has been recorded.</p>
+                  : <button type='button' onClick={requestFirstResume} disabled={guideSaving} className='rounded-xl border border-white/40 px-5 py-3 text-sm font-semibold text-white hover:bg-white/10 disabled:opacity-50'>I’d use a guided resume builder: register my interest</button>)}
                 <button type='button' onClick={() => setGuideOpen(true)} className='text-sm font-medium text-teal-100 underline-offset-4 hover:underline'>Change my answers</button>
               </div>
+              {recommendation.skip && <a href={recommendation.skip.href} className='mt-4 inline-flex items-center gap-2 rounded-xl border border-white/40 px-5 py-3 text-sm font-semibold text-white hover:bg-white/10'>{recommendation.skip.label}<span aria-hidden='true'>→</span></a>}
             </section>
           )
         })()}
 
-        {recommendation?.firstResume && !guideOpen && (
-          <section className='mt-10 rounded-2xl border border-amber-200 bg-amber-50 p-6'>
-            <h2 className='text-lg font-bold text-slate-900'>Help me build my first resume <span className='ml-2 rounded-full bg-amber-200 px-2 py-0.5 text-xs font-semibold text-amber-900'>Under consideration</span></h2>
-            <p className='mt-2 text-sm leading-6 text-slate-700'>We’re considering a guided builder for people writing their first resume. Would you use it? Register your interest.</p>
-            {guide?.first_resume_early_access_at
-              ? <p role='status' className='mt-4 text-sm font-semibold text-emerald-800'>✓ Thanks, your interest has been recorded.</p>
-              : <button type='button' onClick={requestFirstResume} disabled={guideSaving} className='mt-4 rounded-xl bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-700 disabled:opacity-50'>Register my interest</button>}
-          </section>
-        )}
 
         <div className='mt-10 grid gap-6 md:grid-cols-2 xl:grid-cols-4'>
           {orderedChoices.map(choice => {

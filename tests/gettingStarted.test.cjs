@@ -13,15 +13,17 @@ const { recommend, isComplete, isSkipped } = mod.exports
 
 const r = (has_resume, need, experience = 'early') => recommend({ has_resume, need, experience })
 
-test('no resume → interview prep plus the first-resume early-access offer, whatever the need', () => {
+test('no resume → talk to a recruiter, plus registering interest in a first-resume builder, whatever the need', () => {
   for (const need of ['job', 'interview', 'improve', 'recruiter']) {
-    assert.equal(r('none', need).href, '/interview-prep')
+    assert.equal(r('none', need).href, '/billing#recruiter-support')
     assert.equal(r('none', need).firstResume, true)
   }
 })
 
 test('several versions → master resume, unless the need is an interview or a recruiter', () => {
   assert.equal(r('several', 'job').href, '/master-resume')
+  assert.equal(r('several', 'job').skip.href, '/')
+  assert.equal(r('several', 'improve').skip.href, '/')
   assert.equal(r('several', 'improve').href, '/master-resume')
   assert.equal(r('several', 'interview').href, '/interview-prep')
   assert.equal(r('several', 'recruiter').href, '/billing#recruiter-support')
