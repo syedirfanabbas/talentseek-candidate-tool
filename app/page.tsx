@@ -10,12 +10,8 @@ import { LoadingSpinner } from './components/LoadingSpinner'
 import { AiProcessingNotice } from './components/AiProcessingNotice'
 import { downloadResumeDocx, downloadResumePdf } from '../lib/resumeLayout'
 import { downloadJobMatchReport, downloadProfileReport } from '../lib/reportPdf'
+import { withRetryAdvice } from '../lib/retryAdvice'
 
-const RETRY_ADVICE = 'Please try again, or try a different file.'
-
-function withRetryAdvice(message: string): string {
-  return message.includes(RETRY_ADVICE) ? message : `${message.trim().replace(/[.\s]+$/, '')}. ${RETRY_ADVICE}`
-}
 
 function getInitials(name: string): string {
   return name.trim().split(/\s+/).map(w => w[0]?.toUpperCase() || '').join('')
@@ -399,7 +395,7 @@ export default function CandidateTool() {
                       </button>
                     </div>
                   </div>
-                  {optimizedSaveMessage && <p className={`mb-3 rounded-xl p-3 text-sm ${optimizedSaved ? 'bg-emerald-50 text-emerald-800' : 'bg-amber-50 text-amber-800'}`}>{optimizedSaved && '✓ '}{optimizedSaveMessage}{optimizedSaved && <> <a href='/my-resumes' className='font-semibold underline'>Open My Resumes</a></>}</p>}
+                  {optimizedSaveMessage && <p role='status' className={`mb-3 rounded-xl border-2 p-4 text-base font-semibold ${optimizedSaved ? 'border-emerald-300 bg-emerald-50 text-emerald-900' : 'border-amber-300 bg-amber-50 text-amber-900'}`}>{optimizedSaved && '✓ '}{optimizedSaveMessage}{optimizedSaved && <> <a href='/my-resumes' className='font-semibold underline'>Open My Resumes</a></>}</p>}
                   <pre className='max-h-56 overflow-y-auto whitespace-pre-wrap rounded-xl bg-slate-100 p-4 text-sm text-slate-800'>{optimizedResume}</pre>
                 </div>
 

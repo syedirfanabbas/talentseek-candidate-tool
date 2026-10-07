@@ -112,7 +112,7 @@ export default function BillingPage() {
   const [bookingPolling, setBookingPolling] = useState(false)
   const lastSilentRefresh = useRef(0)
   const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
-  const creditClass = (credits: number | null | undefined) => summary?.unlimited || (credits ?? 0) > 0 ? 'text-emerald-700' : summary ? 'text-red-700' : 'text-slate-900'
+  const creditClass = (credits: number | null | undefined) => summary?.unlimited || (credits ?? 0) > 0 ? 'text-emerald-700' : 'text-slate-900'
   const sessionRequests = recruiterRequests.filter(request => request.service_type === 'recruiter_session' && ['submitted', 'in_review'].includes(request.status || ''))
   const bookableSessions = sessionRequests.filter(request => request.intake_submitted_at && !request.booking)
   const bookedSessions = sessionRequests.filter(request => request.booking)

@@ -6,6 +6,7 @@ import { supabase } from '../../lib/supabase'
 import { AiProcessingNotice } from '../components/AiProcessingNotice'
 import { errorDetail, outOfCreditsMessage } from '../../lib/credits'
 import { runAiJob } from '../../lib/aiJobs'
+import { withRetryAdvice } from '../../lib/retryAdvice'
 import { InterviewPack as PreparationPack, downloadPackPdf, packToText } from '../../lib/interviewPackExport'
 import { takeInterviewPrefill } from '../../lib/interviewPrefill'
 
@@ -89,7 +90,7 @@ export default function InterviewPreparationPage() {
       if (!data?.text) throw new Error(data?.error || errorDetail(data, 'We could not read that file. Please upload a PDF or Word file, or paste the text.'))
       if (target === 'resume') { setResumeText(data.text); setResumeSource(file.name) } else setJobDescription(data.text)
     } catch (uploadError) {
-      setError(uploadError instanceof Error ? uploadError.message : 'Upload failed. Please paste the text instead.')
+      setError(withRetryAdvice(uploadError instanceof Error ? uploadError.message : 'Upload failed. Please paste the text instead.'))
     }
     setUploading('')
   }
@@ -117,7 +118,7 @@ export default function InterviewPreparationPage() {
         headers)
       if (!outcome.ok) {
         const creditMessage = (freeAllowanceGranted === false && outcome.status === 402 ? 'The free allowance is one per person. Buy a pack to continue.' : outOfCreditsMessage(outcome.status, outcome.body))
-        if (creditMessage) { setNeedsCredits(true); throw new Error(creditMessage) }
+        if (creditMessage) { setNeedsCredits(true); throw Object.assign(new Error(creditMessage), { noRetryAdvice: true }) }
         throw new Error(errorDetail(outcome.body, 'Unable to generate your interview preparation pack.'))
       }
       setPack(outcome.result)
@@ -125,7 +126,7 @@ export default function InterviewPreparationPage() {
       setKept(false)
       setExportMessage('')
     } catch (generationError) {
-      setError(generationError instanceof Error ? generationError.message : 'Unable to generate your interview preparation pack.')
+      setError(generationError instanceof Error && (generationError as Error & { noRetryAdvice?: boolean }).noRetryAdvice ? generationError.message : withRetryAdvice(generationError instanceof Error ? generationError.message : 'Unable to generate your interview preparation pack.'))
     }
     setLoading(false)
   }
