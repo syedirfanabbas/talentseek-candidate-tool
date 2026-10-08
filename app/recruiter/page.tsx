@@ -2,10 +2,8 @@
 
 import { useEffect, useState } from 'react'
 import { LoadingSpinner } from '../components/LoadingSpinner'
-import { Document, Packer, Paragraph, TextRun, BorderStyle } from 'docx'
+import { downloadResumePdf as exportResumePdf, downloadResumeDocx as exportResumeDocx } from '../../lib/resumeLayout'
 import { BrandedReportPdf } from '../../lib/reportPdf'
-import { saveAs } from 'file-saver'
-import jsPDF from 'jspdf'
 import { supabase } from '../../lib/supabase'
 import { useJobLink } from '../../lib/useJobLink'
 import { apiErrorMessage } from '../../lib/apiError'
@@ -21,65 +19,6 @@ type CareerAnalysis = {
   status?: string
   questions?: string[]
   error?: string
-}
-
-function classifyLine(line: string, idx: number, lines: string[]) {
-  const t = line.trim()
-  if (!t) return { type: 'empty', text: '' }
-  const first = lines.findIndex(l => l.trim())
-  if (idx === first) return { type: 'name', text: t }
-  let c = 0
-  for (let i = 0; i < lines.length; i++) {
-    if (lines[i].trim()) { c++; if (c === 2 && i === idx) return { type: 'contact', text: t } }
-  }
-  if (/^[A-Z][A-Z\s&/()]{3,}$/.test(t)) return { type: 'section', text: t }
-  if (t.startsWith('- ')) return { type: 'bullet', text: t.slice(2).trim() }
-  if ((t.match(/\|/g) || []).length >= 2) return { type: 'skills', text: t }
-  if (/\d{4}/.test(t) && t.length < 40) return { type: 'date', text: t }
-  return { type: 'text', text: t }
-}
-
-function buildDocx(resumeText: string): Paragraph[] {
-  const lines = resumeText.split('\n')
-  return lines.map((line, i) => {
-    const { type, text } = classifyLine(line, i, lines)
-    if (type === 'empty') return new Paragraph({ children: [], spacing: { after: 40 } })
-    if (type === 'name') return new Paragraph({
-      children: [new TextRun({ text, bold: true, size: 36, font: 'Calibri', color: '1E3A5F' })],
-      spacing: { after: 40 },
-    })
-    if (type === 'contact') return new Paragraph({
-      children: [new TextRun({ text, size: 18, font: 'Calibri', color: '555555' })],
-      spacing: { after: 120 },
-    })
-    if (type === 'section') return new Paragraph({
-      children: [new TextRun({ text: text.toUpperCase(), bold: true, size: 22, font: 'Calibri', color: '1E3A5F' })],
-      spacing: { before: 240, after: 80 },
-      border: { bottom: { color: '1E3A5F', size: 6, space: 1, style: BorderStyle.SINGLE } },
-    })
-    if (type === 'date') return new Paragraph({
-      children: [new TextRun({ text, size: 18, font: 'Calibri', color: '666666', italics: true })],
-      spacing: { after: 60 },
-    })
-    if (type === 'bullet') return new Paragraph({
-      children: [new TextRun({ text, size: 19, font: 'Calibri' })],
-      bullet: { level: 0 }, spacing: { after: 60 }, indent: { left: 360 },
-    })
-    if (type === 'skills') {
-      const parts = text.split('|').map(s => s.trim())
-      const runs: TextRun[] = []
-      parts.forEach((p, i) => {
-        runs.push(new TextRun({ text: p, size: 19, font: 'Calibri' }))
-        if (i < parts.length - 1) runs.push(new TextRun({ text: '  |  ', size: 19, font: 'Calibri', color: '888888' }))
-      })
-      return new Paragraph({ children: runs, spacing: { after: 60 } })
-    }
-    const bold = /^[A-Z]/.test(text) && text.length < 80 && !text.endsWith('.')
-    return new Paragraph({
-      children: [new TextRun({ text, size: 20, font: 'Calibri', bold })],
-      spacing: { after: 60 },
-    })
-  })
 }
 
 const fitColor = (fit: string) =>
@@ -228,29 +167,8 @@ export default function RecruiterTool() {
     finally { setIsLoading(false); setLoadingStep('') }
   }
 
-  const downloadResumePdf = () => {
-    const doc = new jsPDF({ unit: 'pt', format: 'letter' })
-    const margin = 60, pageW = doc.internal.pageSize.getWidth()
-    const pageH = doc.internal.pageSize.getHeight(), maxW = pageW - margin * 2
-    let y = margin
-    const check = (n: number) => { if (y + n > pageH - margin) { doc.addPage(); y = margin } }
-    optimized.split('\n').forEach((line, i) => {
-      const { type, text } = classifyLine(line, i, optimized.split('\n'))
-      if (type === 'empty') { y += 5; return }
-      if (type === 'name') { check(32); doc.setFont('helvetica','bold'); doc.setFontSize(18); doc.setTextColor(30,58,95); doc.text(text,margin,y); y+=24; doc.setTextColor(0,0,0) }
-      else if (type === 'contact') { check(16); doc.setFont('helvetica','normal'); doc.setFontSize(9); doc.setTextColor(80,80,80); doc.text(text,margin,y); y+=18; doc.setTextColor(0,0,0) }
-      else if (type === 'section') { check(28); y+=10; doc.setFont('helvetica','bold'); doc.setFontSize(11); doc.setTextColor(30,58,95); doc.text(text.toUpperCase(),margin,y); y+=4; doc.setDrawColor(30,58,95); doc.setLineWidth(0.75); doc.line(margin,y,pageW-margin,y); y+=14; doc.setFont('helvetica','normal'); doc.setFontSize(10); doc.setTextColor(0,0,0) }
-      else if (type === 'date') { check(14); doc.setFont('helvetica','italic'); doc.setFontSize(9); doc.setTextColor(100,100,100); doc.text(text,margin,y); y+=14; doc.setFont('helvetica','normal'); doc.setTextColor(0,0,0) }
-      else if (type === 'bullet') { doc.setFont('helvetica','normal'); doc.setFontSize(10); doc.splitTextToSize('•  '+text, maxW-15).forEach((l:string,idx:number)=>{ check(13); doc.text(l,margin+(idx===0?0:10),y); y+=13 }) }
-      else { const b=/^[A-Z]/.test(text)&&text.length<80&&!text.endsWith('.'); doc.setFont('helvetica',b?'bold':'normal'); doc.setFontSize(10); doc.splitTextToSize(text,maxW).forEach((l:string)=>{ check(14); doc.text(l,margin,y); y+=14 }) }
-    })
-    doc.save(`${candidateName.replace(/\s+/g,'-')}-optimized.pdf`)
-  }
-
-  const downloadResumeDocx = async () => {
-    const doc = new Document({ sections: [{ properties: { page: { margin: { top:720,bottom:720,left:1080,right:1080 } } }, children: buildDocx(optimized) }] })
-    saveAs(await Packer.toBlob(doc), `${candidateName.replace(/\s+/g,'-')}-optimized.docx`)
-  }
+  const downloadResumePdf = () => exportResumePdf(optimized, `${candidateName.replace(/\s+/g, '-')}-optimized`, null)
+  const downloadResumeDocx = () => exportResumeDocx(optimized, `${candidateName.replace(/\s+/g, '-')}-optimized`, null)
 
   const feedbackFilename = () => { const role = (targetRole || 'recruiter-feedback').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, ''); return `TalentSeek-recruiter-feedback-${role}-${new Date().toISOString().slice(0, 10)}.pdf` }
   const downloadFeedbackPdf = async () => {
