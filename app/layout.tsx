@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
+import { SignupSourceCapture } from './components/SignupSourceCapture';
 import { AppNavigation } from './components/AppNavigation';
 
 const geistSans = Geist({
@@ -24,7 +25,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       lang="en"
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
-      <body className="min-h-full flex flex-col"><AppNavigation />{children}</body>
+      <body className="min-h-full flex flex-col"><SignupSourceCapture /><AppNavigation />{children}</body>
     </html>
   );
 }

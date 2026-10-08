@@ -1,3 +1,4 @@
+import { cleanSourceTag } from './lib/signupSource'
 import { createServerClient } from '@supabase/ssr'
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
@@ -48,7 +49,13 @@ export async function middleware(req: NextRequest) {
   }
 
   if (!user && !isAuthPage) {
-    return redirectTo(signInUrl(pathname + req.nextUrl.search))
+    const signIn = new URL(signInUrl(pathname + req.nextUrl.search), req.url)
+    // Campaign tags must survive before the first client page can capture them.
+    for (const prefix of ['ts_', 'utm_']) for (const key of ['source', 'medium', 'campaign']) {
+      const tag = cleanSourceTag(req.nextUrl.searchParams.get(prefix + key))
+      if (tag) signIn.searchParams.set(prefix + key, tag)
+    }
+    return redirectTo(signIn.pathname + signIn.search)
   }
 
   if (user && isAuthPage) {

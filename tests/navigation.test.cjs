@@ -24,6 +24,7 @@ const { defaultDestinationForRole, safeReturnTo, signInUrl } = navigation
 async function request(route, user = null, refreshCookies = false) {
   const { middleware } = loadModule('middleware.ts', {
     './lib/navigation': navigation,
+    './lib/signupSource': loadModule('lib/signupSource.ts'),
     '@supabase/ssr': {
       createServerClient: (_url, _key, options) => ({
         auth: {
@@ -164,4 +165,15 @@ test('refreshed session cookies are preserved on every redirect branch', async (
     assert.equal(response.cookies.get('test-session').value, 'refreshed')
     assert.match(response.headers.get('set-cookie'), /HttpOnly/i)
   }
+})
+
+
+test('anonymous redirects preserve normalized attribution tags for initial capture', async () => {
+  const response = await request('/billing?ts_source=LinkedIn&ts_campaign=company-posts&utm_medium=Social&secret=private')
+  const url = new URL(response.headers.get('location'))
+  assert.equal(url.searchParams.get('ts_source'), 'linkedin')
+  assert.equal(url.searchParams.get('ts_campaign'), 'company-posts')
+  assert.equal(url.searchParams.get('utm_medium'), 'social')
+  assert.equal(url.searchParams.has('secret'), false)
+  assert.equal(url.searchParams.get('next'), '/billing?ts_source=LinkedIn&ts_campaign=company-posts&utm_medium=Social&secret=private')
 })

@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
+import { getBrowserSignupSource } from '../../lib/signupSource'
 import { supabase } from '../../lib/supabase'
 import { defaultDestinationForRole, safeReturnTo } from '../../lib/navigation'
 import { isEmailNotConfirmed } from '../../lib/authErrors'
@@ -19,6 +20,9 @@ export default function AuthPage() {
   const widgetRef = useRef<HTMLDivElement>(null)
   const widgetId = useRef<string | number | null>(null)
   const [captchaToken, setCaptchaToken] = useState('')
+  useEffect(() => {
+    if (new URLSearchParams(window.location.search).get('mode') === 'register') setMode('register')
+  }, [])
   const siteKey = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY
   useEffect(() => {
     if (!siteKey || !widgetRef.current) return
@@ -79,6 +83,7 @@ export default function AuthPage() {
             emailRedirectTo: `${window.location.origin}/auth`, ...(captchaToken ? { captchaToken } : {}),
             data: {
               full_name: name,
+              signup_source: getBrowserSignupSource(),
               account_type: accountType,
               // Recorded in Supabase's append-only consent ledger at sign-up (migration 014).
               marketing_opt_in: marketingOptIn,
