@@ -27,7 +27,7 @@ function harness(t, saveOk = true) {
     '../../lib/supabase': { supabase: { auth: { async getSession() { return { data: { session: { access_token: 'test-token' } } } } } } },
     '../../lib/apiError': { apiErrorMessage(data, fallback) { return fallback } },
     '../../lib/retryAdvice': { withRetryAdvice: text => text },
-    docx: {}, 'file-saver': {}, jspdf: {},
+    '../../lib/resumeLayout': { downloadResumePdf() {}, downloadResumeDocx() {} },
   }
   const previousFetch = global.fetch, previousWindow = global.window
   t.after(() => { global.fetch = previousFetch; global.window = previousWindow })

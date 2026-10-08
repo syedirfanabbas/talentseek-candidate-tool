@@ -5,81 +5,12 @@ import { MasterResumeUpdates } from '../components/MasterResumeUpdates'
 import { consolidationInputs, MAX_MASTER_INPUTS } from '../../lib/masterResumeInputs'
 import { LoadingSpinner } from '../components/LoadingSpinner'
 import { AiProcessingNotice } from '../components/AiProcessingNotice'
-import { Document, Packer, Paragraph, TextRun, BorderStyle } from 'docx'
-import { saveAs } from 'file-saver'
-import jsPDF from 'jspdf'
+import { downloadResumePdf, downloadResumeDocx } from '../../lib/resumeLayout'
 import { supabase } from '../../lib/supabase'
 import { apiErrorMessage } from '../../lib/apiError'
 import { withRetryAdvice } from '../../lib/retryAdvice'
 
 const MAX_RESUMES = MAX_MASTER_INPUTS
-
-function classifyLine(line: string, lineIndex: number, allLines: string[]): {
-  type: 'name' | 'contact' | 'section' | 'job-date' | 'bullet' | 'skills' | 'empty' | 'text'
-  text: string
-} {
-  const trimmed = line.trim()
-  if (!trimmed) return { type: 'empty', text: '' }
-  const firstNonEmpty = allLines.findIndex(l => l.trim())
-  if (lineIndex === firstNonEmpty) return { type: 'name', text: trimmed }
-  let count = 0
-  for (let i = 0; i < allLines.length; i++) {
-    if (allLines[i].trim()) {
-      count++
-      if (count === 2 && i === lineIndex) return { type: 'contact', text: trimmed }
-    }
-  }
-  if (/^[A-Z][A-Z\s&/()]{3,}$/.test(trimmed)) return { type: 'section', text: trimmed }
-  if (trimmed.startsWith('- ')) return { type: 'bullet', text: trimmed.slice(2).trim() }
-  if ((trimmed.match(/\|/g) || []).length >= 2) return { type: 'skills', text: trimmed }
-  if (/\d{4}/.test(trimmed) && trimmed.length < 40) return { type: 'job-date', text: trimmed }
-  return { type: 'text', text: trimmed }
-}
-
-function buildDocxParagraphs(resumeText: string): Paragraph[] {
-  const lines = resumeText.split('\n')
-  return lines.map((line, i) => {
-    const { type, text } = classifyLine(line, i, lines)
-    if (type === 'empty') return new Paragraph({ children: [], spacing: { after: 40 } })
-    if (type === 'name') return new Paragraph({
-      children: [new TextRun({ text, bold: true, size: 36, font: 'Calibri', color: '1E3A5F' })],
-      spacing: { after: 40 },
-    })
-    if (type === 'contact') return new Paragraph({
-      children: [new TextRun({ text, size: 18, font: 'Calibri', color: '555555' })],
-      spacing: { after: 120 },
-    })
-    if (type === 'section') return new Paragraph({
-      children: [new TextRun({ text: text.toUpperCase(), bold: true, size: 22, font: 'Calibri', color: '1E3A5F' })],
-      spacing: { before: 240, after: 80 },
-      border: { bottom: { color: '1E3A5F', size: 6, space: 1, style: BorderStyle.SINGLE } },
-    })
-    if (type === 'job-date') return new Paragraph({
-      children: [new TextRun({ text, size: 18, font: 'Calibri', color: '666666', italics: true })],
-      spacing: { after: 60 },
-    })
-    if (type === 'bullet') return new Paragraph({
-      children: [new TextRun({ text, size: 19, font: 'Calibri' })],
-      bullet: { level: 0 },
-      spacing: { after: 60 },
-      indent: { left: 360 },
-    })
-    if (type === 'skills') {
-      const parts = text.split('|').map(s => s.trim())
-      const runs: TextRun[] = []
-      parts.forEach((part, idx) => {
-        runs.push(new TextRun({ text: part, size: 19, font: 'Calibri' }))
-        if (idx < parts.length - 1) runs.push(new TextRun({ text: '  |  ', size: 19, font: 'Calibri', color: '888888' }))
-      })
-      return new Paragraph({ children: runs, spacing: { after: 60 } })
-    }
-    const isBold = /^[A-Z]/.test(text) && text.length < 80 && !text.endsWith('.')
-    return new Paragraph({
-      children: [new TextRun({ text, size: 20, font: 'Calibri', bold: isBold })],
-      spacing: { after: 60 },
-    })
-  })
-}
 
 async function errorMessage(res: Response, fallback: string): Promise<string> { return apiErrorMessage(await res.json().catch(() => null), fallback) }
 
@@ -198,63 +129,8 @@ export default function MasterResume() {
     window.location.assign('/')
   }
 
-  const downloadDocx = async () => {
-    const doc = new Document({
-      sections: [{
-        properties: { page: { margin: { top: 720, bottom: 720, left: 1080, right: 1080 } } },
-        children: buildDocxParagraphs(masterResume),
-      }]
-    })
-    saveAs(await Packer.toBlob(doc), 'master-resume.docx')
-  }
-
-  const downloadPdf = () => {
-    const doc = new jsPDF({ unit: 'pt', format: 'letter' })
-    const margin = 60
-    const pageW = doc.internal.pageSize.getWidth()
-    const pageH = doc.internal.pageSize.getHeight()
-    const maxW = pageW - margin * 2
-    let y = margin
-    const checkPage = (n: number) => { if (y + n > pageH - margin) { doc.addPage(); y = margin } }
-
-    const lines = masterResume.split('\n')
-    lines.forEach((line, i) => {
-      const { type, text } = classifyLine(line, i, lines)
-      if (type === 'empty') { y += 5; return }
-      if (type === 'name') {
-        checkPage(32)
-        doc.setFont('helvetica', 'bold'); doc.setFontSize(18); doc.setTextColor(30, 58, 95)
-        doc.text(text, margin, y); y += 24; doc.setTextColor(0, 0, 0)
-      } else if (type === 'contact') {
-        checkPage(16)
-        doc.setFont('helvetica', 'normal'); doc.setFontSize(9); doc.setTextColor(80, 80, 80)
-        doc.text(text, margin, y); y += 18; doc.setTextColor(0, 0, 0)
-      } else if (type === 'section') {
-        checkPage(28); y += 10
-        doc.setFont('helvetica', 'bold'); doc.setFontSize(11); doc.setTextColor(30, 58, 95)
-        doc.text(text.toUpperCase(), margin, y); y += 4
-        doc.setDrawColor(30, 58, 95); doc.setLineWidth(0.75)
-        doc.line(margin, y, pageW - margin, y); y += 14
-        doc.setFont('helvetica', 'normal'); doc.setFontSize(10); doc.setTextColor(0, 0, 0)
-      } else if (type === 'job-date') {
-        checkPage(14)
-        doc.setFont('helvetica', 'italic'); doc.setFontSize(9); doc.setTextColor(100, 100, 100)
-        doc.text(text, margin, y); y += 14
-        doc.setFont('helvetica', 'normal'); doc.setTextColor(0, 0, 0)
-      } else if (type === 'bullet') {
-        doc.setFont('helvetica', 'normal'); doc.setFontSize(10)
-        const wrapped = doc.splitTextToSize('•  ' + text, maxW - 15)
-        wrapped.forEach((l: string, idx: number) => {
-          checkPage(13); doc.text(l, margin + (idx === 0 ? 0 : 10), y); y += 13
-        })
-      } else {
-        const isBold = /^[A-Z]/.test(text) && text.length < 80 && !text.endsWith('.')
-        doc.setFont('helvetica', isBold ? 'bold' : 'normal'); doc.setFontSize(10)
-        doc.splitTextToSize(text, maxW).forEach((l: string) => { checkPage(14); doc.text(l, margin, y); y += 14 })
-      }
-    })
-    doc.save('master-resume.pdf')
-  }
+  const downloadDocx = () => downloadResumeDocx(masterResume, 'master-resume', null)
+  const downloadPdf = () => downloadResumePdf(masterResume, 'master-resume', null)
 
   return (
     <main className='min-h-screen bg-slate-50 px-6 py-10'>
