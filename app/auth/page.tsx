@@ -20,17 +20,27 @@ export default function AuthPage() {
   const widgetRef = useRef<HTMLDivElement>(null)
   const widgetId = useRef<string | number | null>(null)
   const [captchaToken, setCaptchaToken] = useState('')
+  const [captchaProblem, setCaptchaProblem] = useState(false)
   useEffect(() => {
     if (new URLSearchParams(window.location.search).get('mode') === 'register') setMode('register')
   }, [])
   const siteKey = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY
   useEffect(() => {
     if (!siteKey || !widgetRef.current) return
-    const render = () => { const turnstile = (window as any).turnstile; if (turnstile && widgetRef.current && widgetId.current === null) widgetId.current = turnstile.render(widgetRef.current, { sitekey: siteKey, callback: (token: string) => setCaptchaToken(token), 'error-callback': () => setMessage({ text: 'Security check failed. Please try again.', type: 'error' }) }) }
+    const render = () => { const turnstile = (window as any).turnstile; if (turnstile && widgetRef.current && widgetId.current === null) widgetId.current = turnstile.render(widgetRef.current, { sitekey: siteKey, 'refresh-expired': 'auto', callback: (token: string) => { setCaptchaToken(token); setCaptchaProblem(false) }, 'expired-callback': () => setCaptchaToken(''), 'error-callback': () => { setCaptchaToken(''); setCaptchaProblem(true) } }) }
     const script = document.createElement('script'); script.src = 'https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit'; script.async = true; script.onload = render; document.head.appendChild(script); render()
-    return () => { script.remove() }
+    // If the check never produces a token (blocked script, strict tracking prevention), say so instead of failing silently.
+    const slow = window.setTimeout(() => setCaptchaProblem(problem => problem || !widgetId.current), 15000)
+    return () => { script.remove(); window.clearTimeout(slow) }
   }, [siteKey])
-  const resetCaptcha = () => { const turnstile = (window as any).turnstile; if (turnstile && widgetId.current !== null) turnstile.reset(widgetId.current); setCaptchaToken('') }
+  useEffect(() => {
+    if (!siteKey || captchaToken) return
+    const slow = window.setTimeout(() => setCaptchaProblem(true), 15000)
+    return () => window.clearTimeout(slow)
+  }, [siteKey, captchaToken])
+  const captchaPending = Boolean(siteKey) && !captchaToken
+  const CAPTCHA_HELP = 'The security check didn’t finish. Please refresh the page and wait for the check to complete. If it still doesn’t load, allow talentseek.ca in your ad or tracking blocker, or try another browser (for example Chrome).'
+  const resetCaptcha = () => { const turnstile = (window as any).turnstile; if (turnstile && widgetId.current !== null) turnstile.reset(widgetId.current); setCaptchaToken(''); setCaptchaProblem(false) }
   const [message, setMessage] = useState<{ text: string; type: 'success' | 'error' } | null>(null)
 
   const resendConfirmation = async () => {
@@ -44,7 +54,7 @@ export default function AuthPage() {
     setIsLoading(false)
     resetCaptcha()
     setMessage(error
-      ? { text: /rate limit|too many requests|seconds/i.test(error.message) ? 'Please wait a minute before requesting another confirmation email.' : error.message, type: 'error' }
+      ? { text: /rate limit|too many requests|seconds/i.test(error.message) ? 'Please wait a minute before requesting another confirmation email.' : /captcha/i.test(error.message) ? CAPTCHA_HELP : error.message, type: 'error' }
       : { text: `A new confirmation link was sent to ${unconfirmedEmail}. It is valid for 24 hours. If you don't see it, check your spam or junk folder.`, type: 'success' })
   }
 
@@ -118,9 +128,11 @@ export default function AuthPage() {
       }
       const errorText = String(err?.message || '')
       const rateLimited = /rate limit|too many requests/i.test(errorText)
+      const captchaFailed = /captcha/i.test(errorText)
       setMessage({
         text: rateLimited
           ? 'TalentSeek’s email service is temporarily at its sending limit. Please wait up to one hour before requesting another email.'
+          : captchaFailed ? CAPTCHA_HELP
           : errorText || 'Something went wrong',
         type: 'error',
       })
@@ -222,6 +234,13 @@ export default function AuthPage() {
           </div>
 
           {siteKey && <div ref={widgetRef} className='mt-4' />}
+          {siteKey && captchaPending && !captchaProblem && <p className='mt-2 text-xs text-slate-500'>Checking your browser… this usually takes a few seconds.</p>}
+          {siteKey && captchaProblem && (
+            <div role='alert' className='mt-3 rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900'>
+              {CAPTCHA_HELP}
+              <button type='button' onClick={resetCaptcha} className='mt-2 block font-semibold underline'>Try the security check again</button>
+            </div>
+          )}
 
           {message && (
             <div className={`mt-4 rounded-xl p-3 text-sm ${
@@ -232,15 +251,15 @@ export default function AuthPage() {
           )}
 
           {mode === 'login' && unconfirmedEmail && (
-            <button onClick={() => void resendConfirmation()} disabled={isLoading}
+            <button onClick={() => void resendConfirmation()} disabled={isLoading || captchaPending}
               className='mt-3 w-full rounded-xl border border-slate-300 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50'>
               Resend confirmation email
             </button>
           )}
 
-          <button onClick={handleSubmit} disabled={isLoading}
+          <button onClick={handleSubmit} disabled={isLoading || captchaPending}
             className='mt-6 w-full rounded-xl bg-slate-900 py-3 text-sm font-semibold text-white hover:bg-slate-800 disabled:opacity-50'>
-            {isLoading ? 'Please wait...' : mode === 'forgot' ? 'Send Reset Link' : mode === 'login' ? 'Sign In' : accountType === 'employer' ? 'Create Employer Account' : 'Create Candidate Account'}
+            {isLoading ? 'Please wait...' : captchaPending ? 'Completing security check…' : mode === 'forgot' ? 'Send Reset Link' : mode === 'login' ? 'Sign In' : accountType === 'employer' ? 'Create Employer Account' : 'Create Candidate Account'}
           </button>
 
           {mode === 'login' && (
