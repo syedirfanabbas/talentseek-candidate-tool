@@ -20,11 +20,11 @@ test('no resume → talk to a recruiter, plus registering interest in a first-re
   }
 })
 
-test('several versions → master resume, unless the need is an interview or a recruiter', () => {
-  assert.equal(r('several', 'job').href, '/master-resume')
-  assert.equal(r('several', 'job').skip.href, '/')
-  assert.equal(r('several', 'improve').skip.href, '/')
-  assert.equal(r('several', 'improve').href, '/master-resume')
+test('several versions → Tailor first, master resume optional; interview and recruiter keep precedence', () => {
+  for (const need of ['job', 'improve']) {
+    assert.equal(r('several', need).href, '/')
+    assert.equal(r('several', need).skip.href, '/master-resume')
+  }
   assert.equal(r('several', 'interview').href, '/interview-prep')
   assert.equal(r('several', 'recruiter').href, '/billing#recruiter-support')
 })
@@ -57,16 +57,16 @@ test('records with unknown values or versions are not trusted', () => {
 })
 
 
-test('old resume routes to update flow with stable master card identity and a direct skip', () => {
+test('old resume → Tailor first, with the master resume update flow as an option', () => {
   for (const experience of ['student', 'early', 'experienced']) {
     for (const need of ['job', 'improve']) {
       const result = r('old', need, experience)
-      assert.equal(result.href, '/master-resume')
-      assert.equal(result.destination, '/master-resume?start=update')
-      assert.deepEqual(result.skip, r('several', need).skip)
+      assert.equal(result.href, '/')
+      assert.equal(result.destination, undefined)
+      assert.equal(result.skip.href, '/master-resume?start=update')
+      assert.ok(result.skip.note)
     }
     assert.equal(r('old', 'interview', experience).href, '/interview-prep')
     assert.equal(r('old', 'recruiter', experience).href, '/billing#recruiter-support')
-    assert.equal(r('old', 'interview', experience).destination, undefined)
   }
 })

@@ -41,8 +41,20 @@ export function validStoredSource(value: unknown, now: number): SignupSource | n
     captured_at: new Date(timestamp).toISOString(),
   }
 }
+// Links copied from web pages or chat apps sometimes carry "&amp;" (or %26amp%3B) instead of "&",
+// which would glue every tag into utm_source. Repair the query before reading it.
+export function repairSearch(search: string): string {
+  let s = search || ''
+  for (let i = 0; i < 3; i++) {
+    const before = s
+    s = s.replace(/%26amp%3B/gi, '&').replace(/&amp;/gi, '&').replace(/((?:utm|ts)_[a-z]+)%3D/gi, '$1=')
+    if (s === before) break
+  }
+  return s
+}
+
 export function sourceFromLanding(search: string, referrer: string, now = Date.now()): SignupSource {
-  const params = new URLSearchParams(search)
+  const params = new URLSearchParams(repairSearch(search))
   const domain = referrerDomain(referrer)
   const externalDomain = isTalentSeekDomain(domain) ? '' : domain
   for (const prefix of ['ts_', 'utm_']) {

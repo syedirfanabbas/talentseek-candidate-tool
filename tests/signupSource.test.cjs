@@ -61,3 +61,14 @@ test('readable report channels follow ordered rules and older accounts remain un
   for (const [source, medium, expected] of cases) assert.equal(signupChannel({ source, medium }), expected)
   assert.equal(signupChannel(null), 'Other')
 })
+
+
+test('links with &amp; or %26amp%3B still give clean tags', () => {
+  for (const search of ['?utm_source=linkedin&amp;utm_medium=personal_dm&amp;utm_campaign=softlaunch_referral',
+                        '?utm_source=linkedin%26amp%3Butm_medium%3Dpersonal_dm%26amp%3Butm_campaign%3Dsoftlaunch_referral']) {
+    const s = mod.exports.sourceFromLanding(search, '', Date.parse('2026-10-12T00:00:00Z'))
+    assert.equal(s.source, 'linkedin')
+    assert.equal(s.medium, 'personal_dm')
+    assert.equal(s.campaign, 'softlaunch_referral')
+  }
+})
