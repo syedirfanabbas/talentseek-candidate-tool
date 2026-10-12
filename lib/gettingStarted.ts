@@ -8,7 +8,7 @@ export type Need = 'job' | 'interview' | 'improve' | 'recruiter'
 export type GettingStartedAnswers = { has_resume: HasResume; experience: Experience; need: Need }
 export type GettingStartedRecord = Partial<GettingStartedAnswers> & { version: 1; answered_at?: string; skipped_at?: string; first_resume_early_access_at?: string }
 
-export type Recommendation = { href: string; destination?: string; reason: string; firstResume?: boolean; skip?: { href: string; label: string } }
+export type Recommendation = { href: string; destination?: string; reason: string; firstResume?: boolean; skip?: { href: string; label: string; note?: string } }
 
 export const QUESTIONS = [
   { key: 'has_resume', question: 'Do you have a resume right now?', options: [
@@ -35,13 +35,15 @@ export function recommend(answers: GettingStartedAnswers): Recommendation {
   if (answers.has_resume === 'none')
     return { href: '/billing#recruiter-support', firstResume: true,
       reason: 'Talk to an experienced recruiter about getting started, or tell us you’d use a guided first-resume builder (under consideration).' }
+  // Tailor first for everyone with a resume (Oct 12 data: 4 of 5 who started in Tailor ran an optimization;
+  // 1 of 6 sent to Master Resume first did). The master resume stays one click away.
   if (answers.has_resume === 'several' && answers.need !== 'interview' && answers.need !== 'recruiter')
-    return { href: '/master-resume', reason: 'Combine your different resume versions into one master resume, then tailor it for each job.',
-      skip: { href: '/', label: 'Skip: go directly to Tailor My Resume with an existing resume (no master resume needed)' } }
+    return { href: '/', reason: 'Start with your most recent resume version and the job ad: you’ll have a tailored resume in a few minutes.',
+      skip: { href: '/master-resume', label: 'Optional: combine your versions into a master resume later' } }
   if (answers.has_resume === 'old' && (answers.need === 'job' || answers.need === 'improve'))
-    return { href: '/master-resume', destination: '/master-resume?start=update',
-      reason: 'Add your recent experience to your old resume, review your master resume, then tailor it to a job.',
-      skip: { href: '/', label: 'Skip: go directly to Tailor My Resume with an existing resume (no master resume needed)' } }
+    return { href: '/', reason: 'Upload your resume and paste the job ad. You can add recent experience straight into your resume text before you tailor it.',
+      skip: { href: '/master-resume?start=update', label: 'Optional: update your old resume in Master Resume first',
+        note: 'Tip: in Tailor My Resume you can paste recent roles and dates straight into your resume text.' } }
   if (answers.need === 'interview') return { href: '/interview-prep', reason: 'Get likely questions and a preparation plan for your interview.' }
   if (answers.need === 'recruiter') return { href: '/billing#recruiter-support', reason: 'Book a written review or a 30-minute session with an experienced recruiter.' }
   if (answers.need === 'improve')

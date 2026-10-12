@@ -153,7 +153,7 @@ export default function DashboardPage() {
                   : <button type='button' onClick={requestFirstResume} disabled={guideSaving} className='rounded-xl border border-white/40 px-5 py-3 text-sm font-semibold text-white hover:bg-white/10 disabled:opacity-50'>I’d use a guided resume builder: register my interest</button>)}
                 <button type='button' onClick={() => setGuideOpen(true)} className='text-sm font-medium text-teal-100 underline-offset-4 hover:underline'>Change my answers</button>
               </div>
-              {recommendation.skip && <><a href={recommendation.skip.href} className='mt-4 inline-flex items-center gap-2 rounded-xl border border-white/40 px-5 py-3 text-sm font-semibold text-white hover:bg-white/10'>{recommendation.skip.label}<span aria-hidden='true'>→</span></a><p className='mt-2 text-sm text-slate-200'>You can also paste recent details straight into your resume in Tailor My Resume.</p></>}
+              {recommendation.skip && <><a href={recommendation.skip.href} className='mt-4 inline-flex items-center gap-2 rounded-xl border border-white/40 px-5 py-3 text-sm font-semibold text-white hover:bg-white/10'>{recommendation.skip.label}<span aria-hidden='true'>→</span></a>{recommendation.skip.note && <p className='mt-2 text-sm text-slate-200'>{recommendation.skip.note}</p>}</>}
             </section>
           )
         })()}
