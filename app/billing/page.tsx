@@ -58,7 +58,7 @@ function RecruiterIntakeCard({ request, apiUrl, onSubmitted }: { request: Recrui
     const data = new FormData(); data.append('file', file)
     const response = await fetch(`${apiUrl}/resumes/parse-demo`, { method: 'POST', headers: await authHeaders(), body: data })
     const result = await response.json()
-    if (!response.ok || !result.text) { setMessage(result.error || 'Unable to read that file.'); return }
+    if (!response.ok || !result.text) { setMessage(typeof result?.error === 'string' ? result.error : apiErrorMessage(result, 'Unable to read that file.')); return }
     setResume(result.text); setResumeLabel(file.name)
   }
   const submit = async () => {
@@ -77,9 +77,9 @@ function RecruiterIntakeCard({ request, apiUrl, onSubmitted }: { request: Recrui
     <p className='mt-2 text-sm text-slate-700'>For your {request.service_type === 'recruiter_session' ? 'strategy session' : 'written review'}: {request.target_role}</p>
     <div className='mt-5 grid gap-4 md:grid-cols-2'>
       <label className='text-sm font-medium text-slate-700'>Use a saved resume<select value='' onChange={event => { const item = saved.find(resume => resume.key === event.target.value); if (item) { setResume(item.content); setResumeLabel(item.label) } }} className='mt-1.5 w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-slate-900'><option value=''>Choose a saved resume…</option>{saved.map(item => <option key={item.key} value={item.key}>{item.label}</option>)}</select></label>
-      <label className='text-sm font-medium text-slate-700'>Upload a resume<input type='file' accept='.pdf,.docx' onChange={event => { const file = event.target.files?.[0]; if (file) void parseResume(file) }} className='mt-1.5 block w-full text-sm text-slate-700' /></label>
+      <label className='text-sm font-medium text-slate-700'>Upload a resume<input type='file' accept='.pdf,.docx' onChange={event => { const file = event.target.files?.[0]; if (file) void parseResume(file) }} className='mt-1.5 block w-full text-sm text-slate-700' /><span className='mt-1 block text-xs font-normal text-slate-500'>PDF or Word, up to 15 pages.</span></label>
     </div>
-    <label className='mt-4 block text-sm font-medium text-slate-700'>Or paste your resume<textarea value={resume} onChange={event => setResume(event.target.value)} className='mt-1.5 min-h-36 w-full rounded-xl border border-slate-300 p-3 text-slate-900' placeholder='Paste the version you want the recruiter to review.' /></label>
+    <label className='mt-4 block text-sm font-medium text-slate-700'>Or paste your resume<textarea value={resume} onChange={event => setResume(event.target.value)} className='mt-1.5 min-h-36 w-full rounded-xl border border-slate-300 p-3 text-slate-900' placeholder='Paste the version you want the recruiter to review.' />{resume.length > 30000 && <span className='mt-2 block text-sm font-normal text-amber-700'>Resume text is very long. Please use no more than 30,000 characters.</span>}</label>
     <fieldset className='mt-5'><legend className='text-sm font-semibold text-slate-700'>Goal</legend><div className='mt-2 grid gap-2 sm:grid-cols-2'>{goalOptions.map(([value, label]) => <label key={value} className='flex items-center gap-2 text-sm text-slate-700'><input type='radio' checked={goal === value} onChange={() => setGoal(value)} /> {label}</label>)}</div></fieldset>
     <label className='mt-4 block text-sm font-medium text-slate-700'>Tell us more<textarea value={form.goal_details} onChange={event => setForm({ ...form, goal_details: event.target.value })} maxLength={1000} className='mt-1.5 min-h-20 w-full rounded-xl border border-slate-300 p-3 text-slate-900' /></label>
     <div className='mt-4 grid gap-4 md:grid-cols-3'>{[['target_country', 'Target country'], ['target_industry', 'Target industry'], ['current_role', 'Current role']].map(([key, label]) => <label key={key} className='text-sm font-medium text-slate-700'>{label}<input value={form[key as keyof typeof form]} onChange={event => setForm({ ...form, [key]: event.target.value })} className='mt-1.5 w-full rounded-xl border border-slate-300 px-3 py-2 text-slate-900' /></label>)}</div>
