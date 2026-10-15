@@ -48,6 +48,7 @@ type AnalysisResult = {
   experience_score: number
   skills_score: number
   competency_score: number
+  presentation_score?: number
   industry_weight: number
   experience_weight: number
   skills_weight: number
@@ -451,10 +452,11 @@ export default function CandidateTool() {
                           <p>Experience <span className='font-bold'>{analysis.before ? `${analysis.before.experience_score}% → ${analysis.experience_score}%` : `${analysis.experience_score}%`}</span> <span className='opacity-60'>×{analysis.experience_weight}</span></p>
                           <p>Skills <span className='font-bold'>{analysis.before ? `${analysis.before.skills_score}% → ${analysis.skills_score}%` : `${analysis.skills_score}%`}</span> <span className='opacity-60'>×{analysis.skills_weight}</span></p>
                           <p>Competencies <span className='font-bold'>{analysis.before ? `${analysis.before.competency_score}% → ${analysis.competency_score}%` : `${analysis.competency_score}%`}</span> <span className='opacity-60'>×{analysis.competency_weight}</span></p>
+                          {typeof analysis.presentation_score === 'number' && <p>Presentation <span className='font-bold'>{analysis.before && typeof analysis.before.presentation_score === 'number' ? `${analysis.before.presentation_score}% → ${analysis.presentation_score}%` : `${analysis.presentation_score}%`}</span> <span className='opacity-60'>×25%</span></p>}
                         </div>
                       </div>
                       <div className='mt-3 h-2 w-full rounded-full bg-black/10'><div className='h-2 rounded-full bg-current' style={{ width: `${analysis.match_rate}%` }} /></div>
-                      <p className='mt-3 text-xs opacity-80'>Scores are an estimate of how well each version matches this job description, not a prediction of employer or applicant tracking system results.</p>
+                      <p className='mt-3 text-xs opacity-80'>Based on how well your experience fits this job and how clearly your resume shows it. An estimate, not a prediction of employer or applicant tracking system results.</p>
                     </div>
 
                     <div className='rounded-xl border border-green-200 bg-green-50 p-4'>

@@ -17,3 +17,10 @@ test('saved score display omits null scores', () => {
   assert.equal(savedScoreLabel(null, 72), 'Match 72%')
   assert.equal(savedScoreLabel(null, null), null)
 })
+
+const page = fs.readFileSync('app/page.tsx', 'utf8')
+test('match breakdown includes Presentation with and without a before score', () => {
+  assert.match(page, /Presentation/)
+  assert.match(page, /before\.presentation_score/)
+  assert.match(page, /analysis\.presentation_score/)
+})
