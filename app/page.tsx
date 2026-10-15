@@ -288,13 +288,13 @@ export default function CandidateTool() {
         <header className='mb-10 max-w-3xl'><p className='text-sm font-semibold uppercase tracking-widest text-teal-700'>Tailor my resume</p><h1 className='mt-3 text-3xl font-bold tracking-tight text-slate-900 sm:text-5xl'>Tailor your resume to a job.</h1><p className='mt-4 text-lg leading-8 text-slate-600'>Add your resume and the job ad (or a job link), and get a tailored resume with your match score.</p></header>
 
         <div className='grid gap-8 lg:grid-cols-2'>
-          <section className='rounded-2xl bg-white p-6 shadow-sm'>
+          <section className='min-w-0 rounded-2xl bg-white p-6 shadow-sm'>
             <div className='mb-3 flex flex-wrap items-center justify-between gap-2'>
               <h2 className='text-xl font-semibold text-slate-900'>Your Resume</h2>
               {savedResumes.length > 0 && (
                 <select value='' aria-label='Use a saved resume'
                   onChange={(e) => { const saved = savedResumes.find(item => item.key === e.target.value); if (saved) { setResume(saved.content); setResumeSource(saved.label) } }}
-                  className='rounded-lg border border-slate-300 bg-white px-2 py-1.5 text-xs font-semibold text-slate-700'>
+                  className='w-full min-w-0 max-w-full truncate rounded-lg border border-slate-300 bg-white px-2 py-1.5 text-xs font-semibold text-slate-700 sm:w-auto sm:max-w-xs'>
                   <option value=''>Use a saved resume…</option>
                   {savedResumes.map(item => <option key={item.key} value={item.key}>{item.label}</option>)}
                 </select>
