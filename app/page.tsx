@@ -11,6 +11,7 @@ import { AiProcessingNotice } from './components/AiProcessingNotice'
 import { downloadResumeDocx, downloadResumePdf } from '../lib/resumeLayout'
 import { downloadJobMatchReport, downloadProfileReport } from '../lib/reportPdf'
 import { withRetryAdvice } from '../lib/retryAdvice'
+import { scoreSummary, type BeforeScore } from '../lib/matchScore'
 
 
 function getInitials(name: string): string {
@@ -54,6 +55,7 @@ type AnalysisResult = {
   strong_matches: string[]
   moderate_matches: string[]
   gaps: string[]
+  before?: BeforeScore
   error?: string
 }
 
@@ -181,8 +183,8 @@ export default function CandidateTool() {
       setOptimizedResume(data.optimized_content || '')
       setOptimizedLength(Number(resumeLength))
       setProfileImprovements(data.profile_improvements || '')
-      // Save automatically: the user spent a credit on this result and may leave the page.
-      if (data.optimized_content) void saveOptimizedResume(data.optimized_content)
+      // Save automatically before analysis so its before/after scores can be attached to this row.
+      const savedResume = data.optimized_content ? await saveOptimizedResume(data.optimized_content) : null
 
       setIsAnalyzing(true)
       try {
@@ -190,9 +192,13 @@ export default function CandidateTool() {
         const aRes = await fetch(`${API_URL}/resumes/analyze-demo`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', ...authHeaders },
-          body: JSON.stringify({ resume_content: data.optimized_content, job_description: jobDescription }),
+          body: JSON.stringify({ resume_content: data.optimized_content, original_resume_content: resume, job_description: jobDescription }),
         })
-        if (aRes.ok) setAnalysis(await aRes.json())
+        if (aRes.ok) {
+          const analysisResult = await aRes.json() as AnalysisResult
+          setAnalysis(analysisResult)
+          if (savedResume?.id && !analysisResult.error) void saveMatchScores(savedResume.id, analysisResult)
+        }
       } catch (_) {}
       finally { setIsAnalyzing(false) }
 
@@ -200,8 +206,8 @@ export default function CandidateTool() {
     finally { setIsLoading(false) }
   }
 
-  const saveOptimizedResume = async (content: string = optimizedResume) => {
-    if (!content.trim()) return
+  const saveOptimizedResume = async (content: string = optimizedResume): Promise<{ id: string } | null> => {
+    if (!content.trim()) return null
     setIsSavingOptimized(true); setOptimizedSaveMessage('')
     try {
       const response = await fetch(`${API_URL}/resume-library/optimized`, {
@@ -209,10 +215,23 @@ export default function CandidateTool() {
         body: JSON.stringify({ title: [role.trim(), company.trim()].filter(Boolean).join(' – ') || `Tailored resume – ${new Date().toLocaleDateString()}`, content, job_title: role.trim() || null, company_name: company.trim() || null }),
       })
       if (!response.ok) throw new Error(withRetryAdvice('This resume was not saved to your account.'))
+      const saved = await response.json() as { id: string }
       setOptimizedSaved(true)
       setOptimizedSaveMessage('Saved to My Resumes. You can open it any time from your dashboard.')
-    } catch (saveError) { setOptimizedSaveMessage(withRetryAdvice(saveError instanceof Error ? saveError.message : 'This resume was not saved to your account.')) }
-    setIsSavingOptimized(false)
+      return saved
+    } catch (saveError) {
+      setOptimizedSaveMessage(withRetryAdvice(saveError instanceof Error ? saveError.message : 'This resume was not saved to your account.'))
+      return null
+    } finally { setIsSavingOptimized(false) }
+  }
+
+  const saveMatchScores = async (resumeId: string, analysisResult: AnalysisResult) => {
+    const response = await fetch(`${API_URL}/resume-library/optimized/${resumeId}/match`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json', ...await getAuthHeaders() },
+      body: JSON.stringify({ match_before: analysisResult.before?.match_rate ?? null, match_after: analysisResult.match_rate }),
+    })
+    if (!response.ok) console.warn('Unable to save match scores')
   }
 
   // '3' means "Detailed": no page limit, only avoid a nearly empty last page.
@@ -420,23 +439,22 @@ export default function CandidateTool() {
                   <div className='space-y-3'>
                     <div className='flex flex-wrap items-center justify-between gap-3'><h3 className='font-semibold text-slate-800'>Job Match Analysis</h3><button type='button' onClick={() => void downloadAnalysisPdf()} className='rounded-lg border border-red-300 bg-red-50 px-3 py-1.5 text-xs font-medium text-red-700 hover:bg-red-100'>📥 Download analysis (PDF)</button></div>
 
-                    <div className={`rounded-xl border p-4 ${getMatchColor(analysis.match_rate)}`}>
+                    <div className={`rounded-xl border p-4 ${analysis.before && analysis.match_rate <= analysis.before.match_rate ? 'border-slate-200 bg-slate-50 text-slate-800' : getMatchColor(analysis.match_rate)}`}>
                       <div className='flex items-start justify-between'>
                         <div>
-                          <p className='text-xs font-medium uppercase tracking-wide opacity-70'>Overall Match Rate</p>
-                          <p className='text-4xl font-bold leading-tight'>{analysis.match_rate}%</p>
-                          <p className='text-sm font-semibold'>{getMatchLabel(analysis.match_rate)}</p>
+                          <p className='text-xs font-medium uppercase tracking-wide opacity-70'>Match score</p>
+                          <p className='text-3xl font-bold leading-tight'>{scoreSummary(analysis.before?.match_rate, analysis.match_rate)}</p>
+                          {(!analysis.before || analysis.match_rate > analysis.before.match_rate) && <p className='text-sm font-semibold'>{getMatchLabel(analysis.match_rate)}</p>}
                         </div>
                         <div className='text-right space-y-1 text-xs opacity-80'>
-                          <p>Industry <span className='font-bold'>{analysis.industry_score}%</span> <span className='opacity-60'>×{analysis.industry_weight}</span></p>
-                          <p>Experience <span className='font-bold'>{analysis.experience_score}%</span> <span className='opacity-60'>×{analysis.experience_weight}</span></p>
-                          <p>Skills <span className='font-bold'>{analysis.skills_score}%</span> <span className='opacity-60'>×{analysis.skills_weight}</span></p>
-                          <p>Competencies <span className='font-bold'>{analysis.competency_score}%</span> <span className='opacity-60'>×{analysis.competency_weight}</span></p>
+                          <p>Industry <span className='font-bold'>{analysis.before ? `${analysis.before.industry_score}% → ${analysis.industry_score}%` : `${analysis.industry_score}%`}</span> <span className='opacity-60'>×{analysis.industry_weight}</span></p>
+                          <p>Experience <span className='font-bold'>{analysis.before ? `${analysis.before.experience_score}% → ${analysis.experience_score}%` : `${analysis.experience_score}%`}</span> <span className='opacity-60'>×{analysis.experience_weight}</span></p>
+                          <p>Skills <span className='font-bold'>{analysis.before ? `${analysis.before.skills_score}% → ${analysis.skills_score}%` : `${analysis.skills_score}%`}</span> <span className='opacity-60'>×{analysis.skills_weight}</span></p>
+                          <p>Competencies <span className='font-bold'>{analysis.before ? `${analysis.before.competency_score}% → ${analysis.competency_score}%` : `${analysis.competency_score}%`}</span> <span className='opacity-60'>×{analysis.competency_weight}</span></p>
                         </div>
                       </div>
-                      <div className='mt-3 h-2 w-full rounded-full bg-black/10'>
-                        <div className='h-2 rounded-full bg-current' style={{ width: `${analysis.match_rate}%` }} />
-                      </div>
+                      <div className='mt-3 h-2 w-full rounded-full bg-black/10'><div className='h-2 rounded-full bg-current' style={{ width: `${analysis.match_rate}%` }} /></div>
+                      <p className='mt-3 text-xs opacity-80'>Scores are an estimate of how well each version matches this job description, not a prediction of employer or applicant tracking system results.</p>
                     </div>
 
                     <div className='rounded-xl border border-green-200 bg-green-50 p-4'>
