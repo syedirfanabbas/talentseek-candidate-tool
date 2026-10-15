@@ -147,6 +147,7 @@ export default function MasterResume() {
               <label className='mb-4 flex cursor-pointer flex-col items-center gap-2 rounded-xl border-2 border-dashed border-slate-300 px-4 py-6 text-slate-500 hover:border-slate-400'>
                 <span className='text-3xl'>📎</span>
                 <span className='text-sm font-medium'>Click to upload PDF or Word files</span>
+                <span className='text-xs text-slate-500'>Up to 15 pages each</span>
                 <span className='text-xs text-slate-400'>{files.length}/{MAX_RESUMES} uploaded</span>
                 <input
                   type='file'
@@ -192,6 +193,7 @@ export default function MasterResume() {
             )}
 
             <MasterResumeUpdates value={updates} onChange={setUpdates} updateFlow={updateFlow} disabled={isLoading} />
+            {updates.length > 30000 && <p className='mb-3 text-sm text-amber-700'>Resume text is very long. Please use no more than 30,000 characters.</p>}
             <p className='mb-4 text-sm text-slate-700'>Designed to work from your experience: you review everything before you use it.</p>
             <button
               onClick={handleConsolidate}

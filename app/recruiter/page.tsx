@@ -73,8 +73,8 @@ export default function RecruiterTool() {
         headers: authHeaders,
         body: fd,
       })
-      if (!res.ok) throw new Error('Failed to parse file')
-      const data = await res.json()
+      const data = await res.json().catch(() => null)
+      if (!res.ok) throw new Error(apiErrorMessage(data, 'Failed to parse file'))
       if (data.text) setter(data.text)
       else setError(typeof data.error === 'string' ? data.error : apiErrorMessage(data, 'Could not extract text'))
     } catch (err) { setError(err instanceof Error ? err.message : 'Upload failed') }
@@ -237,9 +237,11 @@ export default function RecruiterTool() {
                 disabled={uploadingResume} />
               {uploadingResume ? '⏳ Extracting text...' : resume ? '✅ Resume uploaded — click to replace' : '📎 Upload PDF or Word'}
             </label>
+            <p className='-mt-2 mb-3 text-xs text-slate-500'>PDF or Word, up to 15 pages.</p>
             <textarea value={resume} onChange={e => setResume(e.target.value)}
               placeholder='Or paste resume here...'
               className='mb-4 min-h-[120px] w-full rounded-xl border border-slate-200 bg-white p-3 text-sm text-slate-900 placeholder:text-slate-400 outline-none focus:border-slate-500 shadow-sm' />
+            {resume.length > 30000 && <p className='-mt-2 mb-4 text-sm text-amber-700'>Resume text is very long. Please use no more than 30,000 characters.</p>}
 
             <h2 className='mb-3 text-lg font-semibold text-slate-900'>Job Description</h2>
             <div className='mb-3 flex gap-2'><input value={jobLink} onChange={e => setJobLink(e.target.value)} placeholder='Paste a job link' className='min-w-0 flex-1 rounded-xl border border-slate-200 p-2 text-sm text-slate-900' /><button type='button' disabled={isFetchingJob} onClick={() => void fetchJobText()} className='rounded-xl border border-slate-300 px-3 text-xs font-medium text-slate-700'>{isFetchingJob ? 'Getting…' : 'Get job text'}</button></div>{jobLinkError && <p className='mb-2 text-xs text-red-700'>{jobLinkError}</p>}

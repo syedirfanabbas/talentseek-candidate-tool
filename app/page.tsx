@@ -140,8 +140,8 @@ export default function CandidateTool() {
         headers: authHeaders,
         body: formData,
       })
-      if (!res.ok) throw new Error('Failed to parse file')
-      const data = await res.json()
+      const data = await res.json().catch(() => null)
+      if (!res.ok) throw new Error(apiErrorMessage(data, 'Failed to parse file'))
       if (data.text) { setter(data.text) } else { setError(withRetryAdvice(typeof data.error === 'string' ? data.error : apiErrorMessage(data, 'Could not extract text'))) }
     } catch (err) { setError(withRetryAdvice(err instanceof Error ? err.message : 'Upload failed')) }
     finally { setUploading(false) }
@@ -285,10 +285,12 @@ export default function CandidateTool() {
               <input type='file' accept='.pdf,.docx' className='hidden' onChange={handleResumeFile} disabled={uploadingResume} />
               {uploadingResume ? 'Extracting...' : '📎 Upload PDF or Word'}
             </label>
+            <p className='-mt-1 mb-3 text-xs text-slate-500'>PDF or Word, up to 15 pages.</p>
             {resumeSource && resume && <p className='mb-2 text-xs text-teal-700'>Using: {resumeSource}</p>}
             <textarea value={resume} onChange={(e) => { setResume(e.target.value); if (!e.target.value) setResumeSource('') }}
               placeholder='Or paste your resume here, or choose a saved resume above...'
               className='min-h-[160px] w-full rounded-xl border border-slate-300 p-4 text-sm text-slate-900 outline-none focus:border-slate-500' />
+            {resume.length > 30000 && <p className='mt-2 text-sm text-amber-700'>Resume text is very long. Please use no more than 30,000 characters.</p>}
             <AiProcessingNotice />
 
             <h2 className='mb-3 mt-5 text-xl font-semibold text-slate-900'>Job Description</h2>
