@@ -4,6 +4,7 @@ export type BeforeScore = {
   experience_score: number
   skills_score: number
   competency_score: number
+  presentation_score?: number
 }
 
 export function scoreSummary(before: number | undefined, after: number): string {
