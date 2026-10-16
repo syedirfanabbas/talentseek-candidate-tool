@@ -8,8 +8,10 @@ export async function GET(request: Request) {
   const url = new URL('/jobs/search', backendUrl)
   const query = new URL(request.url).searchParams.get('query')?.trim()
   const location = new URL(request.url).searchParams.get('location')?.trim()
+  const country = new URL(request.url).searchParams.get('country')?.trim().toLowerCase()
   if (query) url.searchParams.set('query', query)
   if (location) url.searchParams.set('location', location)
+  if (country) url.searchParams.set('country', country)
 
   try {
     const response = await fetch(url, { cache: 'no-store' })
