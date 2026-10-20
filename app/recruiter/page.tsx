@@ -134,8 +134,9 @@ export default function RecruiterTool() {
         body: JSON.stringify({
           resume_content: optimizedContent,
           candidate_name: candidateName,
-          candidate_location: candidateLocation || 'Canada',
+          candidate_location: candidateLocation,
           target_role: targetRole,
+          job_description: jobDescription,
         }),
       })
       const d3 = await r3.json()
